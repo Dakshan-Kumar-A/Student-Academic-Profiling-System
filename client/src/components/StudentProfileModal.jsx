@@ -9,6 +9,55 @@ export default function StudentProfileModal({ student: initialStudent, studentId
     !(initialStudent && typeof initialStudent === 'object' && initialStudent.name) && Boolean(studentId || initialStudent)
   );
 
+  const [editingRemarks, setEditingRemarks] = useState(false);
+  const [savingRemarks, setSavingRemarks] = useState(false);
+  const [remarksForm, setRemarksForm] = useState({
+    placementRemarks: '',
+    entrepreneurshipRemarks: '',
+    higherStudiesRemarks: '',
+    generalRemarks: '',
+  });
+
+  useEffect(() => {
+    if (student?.mentorRemarks) {
+      setRemarksForm({
+        placementRemarks: student.mentorRemarks.placementRemarks || '',
+        entrepreneurshipRemarks: student.mentorRemarks.entrepreneurshipRemarks || '',
+        higherStudiesRemarks: student.mentorRemarks.higherStudiesRemarks || '',
+        generalRemarks: student.mentorRemarks.generalRemarks || '',
+      });
+    }
+  }, [student]);
+
+  const handleSaveRemarks = async () => {
+    if (!student?._id) return;
+    setSavingRemarks(true);
+    try {
+      let res;
+      try {
+        res = await api.put(`/coordinator/students/${student._id}/remarks`, remarksForm);
+      } catch {
+        try {
+          res = await api.put(`/mentor/students/${student._id}/remarks`, remarksForm);
+        } catch {
+          res = await api.put(`/placement/students/${student._id}/remarks`, remarksForm);
+        }
+      }
+
+      if (res?.data?.success) {
+        setStudent({
+          ...student,
+          mentorRemarks: res.data.mentorRemarks,
+        });
+        setEditingRemarks(false);
+      }
+    } catch (err) {
+      console.error('Failed to update student remarks:', err);
+    } finally {
+      setSavingRemarks(false);
+    }
+  };
+
   useEffect(() => {
     if (initialStudent && typeof initialStudent === 'object' && initialStudent.name) {
       setStudent(initialStudent);
@@ -398,6 +447,101 @@ export default function StudentProfileModal({ student: initialStudent, studentId
                 {(!student.careerGoal?.primaryGoal || student.careerGoal?.primaryGoal === 'Undecided') && (
                   <div className="text-muted py-2">
                     <i className="bi bi-info-circle me-1"></i> Career pathway is currently <strong>Undecided</strong>. Path-specific parameters are set to <strong>Nil</strong>.
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Section 7: Mentor & Coordinator Remarks (for QS I-Gauge Excel 1 & Mentoring) */}
+            <div className="card border-0 shadow-sm rounded-3">
+              <div className="card-header bg-white py-2 px-3 fw-bold text-dark border-bottom d-flex justify-content-between align-items-center">
+                <span>
+                  <i className="bi bi-chat-square-quote-fill text-primary me-2"></i> 7. Mentor & Coordinator Remarks (QS I-Gauge)
+                </span>
+                {editingRemarks ? (
+                  <button
+                    className="btn btn-sm btn-primary py-0 px-2 fw-semibold"
+                    disabled={savingRemarks}
+                    onClick={handleSaveRemarks}
+                  >
+                    {savingRemarks ? 'Saving...' : 'Save Remarks'}
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-sm btn-outline-primary py-0 px-2 fw-semibold"
+                    onClick={() => setEditingRemarks(true)}
+                  >
+                    <i className="bi bi-pencil-square me-1"></i> Edit Remarks
+                  </button>
+                )}
+              </div>
+              <div className="card-body p-3 small">
+                {editingRemarks ? (
+                  <div className="row g-2">
+                    <div className="col-md-6">
+                      <label className="form-label text-muted fw-semibold mb-1">Placement Remarks (QS Col 10)</label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        value={remarksForm.placementRemarks}
+                        onChange={(e) => setRemarksForm({ ...remarksForm, placementRemarks: e.target.value })}
+                        placeholder="e.g. Cleared campus technical assessment"
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label text-muted fw-semibold mb-1">Entrepreneurship Remarks (QS Col 14)</label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        value={remarksForm.entrepreneurshipRemarks}
+                        onChange={(e) => setRemarksForm({ ...remarksForm, entrepreneurshipRemarks: e.target.value })}
+                        placeholder="e.g. Registered with institutional MSME cell"
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label text-muted fw-semibold mb-1">Higher Studies Remarks (QS Col 19)</label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        value={remarksForm.higherStudiesRemarks}
+                        onChange={(e) => setRemarksForm({ ...remarksForm, higherStudiesRemarks: e.target.value })}
+                        placeholder="e.g. Qualified GATE exam / Score 620"
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label text-muted fw-semibold mb-1">General Mentoring Remarks</label>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        value={remarksForm.generalRemarks}
+                        onChange={(e) => setRemarksForm({ ...remarksForm, generalRemarks: e.target.value })}
+                        placeholder="e.g. Excellent academic progress and attendance"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="row g-2">
+                    <div className="col-md-6">
+                      <span className="text-muted d-block">Placement Remarks:</span>
+                      <strong>{student.mentorRemarks?.placementRemarks || '—'}</strong>
+                    </div>
+                    <div className="col-md-6">
+                      <span className="text-muted d-block">Entrepreneurship Remarks:</span>
+                      <strong>{student.mentorRemarks?.entrepreneurshipRemarks || '—'}</strong>
+                    </div>
+                    <div className="col-md-6">
+                      <span className="text-muted d-block">Higher Studies Remarks:</span>
+                      <strong>{student.mentorRemarks?.higherStudiesRemarks || '—'}</strong>
+                    </div>
+                    <div className="col-md-6">
+                      <span className="text-muted d-block">General Remarks:</span>
+                      <strong>{student.mentorRemarks?.generalRemarks || '—'}</strong>
+                    </div>
+                    {student.mentorRemarks?.updatedByName && (
+                      <div className="col-12 text-muted fst-italic mt-2" style={{ fontSize: '0.72rem' }}>
+                        Last updated by {student.mentorRemarks.updatedByName} on{' '}
+                        {new Date(student.mentorRemarks.updatedAt).toLocaleDateString()}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
