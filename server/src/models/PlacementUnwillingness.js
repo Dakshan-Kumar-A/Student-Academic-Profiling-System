@@ -43,8 +43,7 @@ const unwillingnessSubmissionSchema = new mongoose.Schema({
     default: true,
   },
   customResponses: {
-    type: Map,
-    of: String,
+    type: mongoose.Schema.Types.Mixed,
     default: {},
   },
   isLocked: {
@@ -96,7 +95,11 @@ const placementUnwillingnessFormSchema = new mongoose.Schema(
     customFields: [
       {
         fieldLabel: { type: String, required: true },
-        fieldType: { type: String, enum: ['text', 'number', 'link', 'textarea', 'dropdown'], default: 'text' },
+        fieldType: {
+          type: String,
+          enum: ['text', 'paragraph', 'textarea', 'dropdown', 'multiple_choice', 'checkboxes', 'number', 'link'],
+          default: 'text',
+        },
         isRequired: { type: Boolean, default: false },
         options: { type: [String], default: [] },
       },

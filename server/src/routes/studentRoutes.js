@@ -47,6 +47,12 @@ router.get('/profile', async (req, res) => {
       .populate('mentorId', 'name email designation department')
       .populate('userId', 'email name role isProfileCompleted');
 
+    const profileData = populated ? populated.toObject() : {};
+    const primaryGoal = typeof profileData.careerGoal === 'object'
+      ? (profileData.careerGoal?.primaryGoal || 'Undecided')
+      : (profileData.careerGoal || 'Undecided');
+    profileData.careerGoal = primaryGoal;
+
     // Also check unwillingness status to inform UI if careerGoal is locked
     const activeForm = await PlacementUnwillingness.findOne({ isActive: true }).lean();
     let unwillingnessStatus = null;
@@ -68,7 +74,7 @@ router.get('/profile', async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      profile: populated,
+      profile: profileData,
       unwillingnessStatus,
     });
   } catch (error) {
@@ -148,7 +154,7 @@ router.put('/profile', async (req, res) => {
       'certifications', 'projects', 'hackathons', 'internshipExperience',
       'githubProfile', 'linkedinProfile', 'hackerrankProfile', 'hackerearthProfile',
       'communicationSkillLevel', 'aptitudeSkillLevel', 'selfEvaluation',
-      'careerGoal', 'higherStudiesDetails', 'entrepreneurshipDetails',
+      'higherStudiesDetails', 'entrepreneurshipDetails',
     ];
 
     allowedKeys.forEach((key) => {
@@ -156,6 +162,17 @@ router.put('/profile', async (req, res) => {
         profile[key] = updates[key];
       }
     });
+
+    if (updates.careerGoal !== undefined) {
+      const goalStr = typeof updates.careerGoal === 'object'
+        ? (updates.careerGoal?.primaryGoal || 'Undecided')
+        : updates.careerGoal;
+      if (!profile.careerGoal || typeof profile.careerGoal !== 'object') {
+        profile.careerGoal = { primaryGoal: goalStr };
+      } else {
+        profile.careerGoal.primaryGoal = goalStr;
+      }
+    }
 
     await profile.save();
 
@@ -636,7 +653,11 @@ router.post('/unwillingness', async (req, res) => {
     await form.save();
 
     // Update Student Profile career goal and path details
-    profile.careerGoal = careerGoalChoice;
+    if (!profile.careerGoal || typeof profile.careerGoal !== 'object') {
+      profile.careerGoal = { primaryGoal: careerGoalChoice };
+    } else {
+      profile.careerGoal.primaryGoal = careerGoalChoice;
+    }
     if (careerGoalChoice === 'Higher Studies') {
       profile.higherStudiesDetails = {
         ...profile.higherStudiesDetails,

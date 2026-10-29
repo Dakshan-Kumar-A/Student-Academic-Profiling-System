@@ -946,7 +946,7 @@ router.get('/unwillingness/form', async (req, res) => {
 // @desc    Placement officer creates/updates unwillingness form definition
 router.post('/unwillingness/form', authorize('placement_officer', 'admin'), async (req, res) => {
   try {
-    const { title, instructions, sampleDocumentUrl, deadline, isActive } = req.body;
+    const { title, instructions, sampleDocumentUrl, deadline, isActive, customFields } = req.body;
 
     let form = await PlacementUnwillingness.findOne({ isActive: true });
     if (!form) {
@@ -958,6 +958,7 @@ router.post('/unwillingness/form', authorize('placement_officer', 'admin'), asyn
     if (sampleDocumentUrl !== undefined) form.sampleDocumentUrl = sampleDocumentUrl;
     if (deadline) form.deadline = new Date(deadline);
     if (isActive !== undefined) form.isActive = Boolean(isActive);
+    if (customFields && Array.isArray(customFields)) form.customFields = customFields;
 
     await form.save();
 
@@ -1028,6 +1029,7 @@ router.post('/unwillingness/submit', async (req, res) => {
       entrepreneurshipDetails: entrepreneurshipDetails || {},
       reasonForUnwillingness: reasonForUnwillingness.trim(),
       signedFormAttachment: signedFormAttachment || '',
+      customResponses: req.body.customResponses || {},
       parentAcknowledgmentAttached: true,
       isLocked: true, // Locked choice!
       allowPlacementSwitch: false,
