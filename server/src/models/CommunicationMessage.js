@@ -14,7 +14,7 @@ const communicationMessageSchema = new mongoose.Schema({
   },
   messageType: {
     type: String,
-    enum: ['circular', 'message', 'enquiry', 'announcement', 'deletion_request'],
+    enum: ['circular', 'message', 'enquiry', 'announcement', 'deletion_request', 'drive_thread'],
     default: 'message',
   },
   // Communication Channels
@@ -56,10 +56,49 @@ const communicationMessageSchema = new mongoose.Schema({
     enum: ['Normal', 'Important', 'Urgent'],
     default: 'Normal',
   },
+  // Target Filtering & Audience Control
   targetGroup: {
     type: String,
-    enum: ['all_students', 'all_mentors', 'selected_students', 'selected_mentors', 'custom_selection', 'individual', 'admin'],
-    default: 'custom_selection',
+    enum: [
+      'all',
+      'all_students',
+      'all_mentors',
+      'all_department',
+      'all_mentees',
+      'selected_students',
+      'selected_mentors',
+      'custom_selection',
+      'individual',
+      'direct_message',
+      'admin',
+    ],
+    default: 'all',
+  },
+  targetSection: {
+    type: String,
+    default: 'all',
+  },
+  menteesOnly: {
+    type: Boolean,
+    default: false,
+  },
+  targetRole: {
+    type: String,
+    default: 'all',
+  },
+  targetDepartment: {
+    type: String,
+    default: 'all',
+  },
+  isDirectMessage: {
+    type: Boolean,
+    default: false,
+  },
+  directRecipient: {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    name: { type: String, default: '' },
+    email: { type: String, default: '' },
+    role: { type: String, default: '' },
   },
   recipients: [
     {
