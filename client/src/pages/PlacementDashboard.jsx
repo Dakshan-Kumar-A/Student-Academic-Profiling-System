@@ -16,7 +16,9 @@ import { Bar, Doughnut } from 'react-chartjs-2';
 import Navbar from '../components/Navbar';
 import FloatingCohortWindow from '../components/FloatingCohortWindow';
 import StudentProfileModal from '../components/StudentProfileModal';
-import { placementAPI, ticketAPI } from '../services/api';
+import CommunicationHub from '../components/CommunicationHub';
+import TicketSupportCenter from '../components/TicketSupportCenter';
+import { placementAPI, ticketAPI, excelAPI } from '../services/api';
 
 ChartJS.register(
   CategoryScale,
@@ -98,13 +100,33 @@ export default function PlacementDashboard({ user }) {
   const [activeDriveForEvaluations, setActiveDriveForEvaluations] = useState(null);
   const [evaluationData, setEvaluationData] = useState(null);
   const [loadingEvaluations, setLoadingEvaluations] = useState(false);
+  const [showRoundsEditor, setShowRoundsEditor] = useState(false);
+  const [editableRounds, setEditableRounds] = useState([]);
+  const [savingRounds, setSavingRounds] = useState(false);
 
-  // Unwillingness Form State
+  // Aspirants Filter State
+  const [aspirantDeptFilter, setAspirantDeptFilter] = useState('all');
+  const [aspirantCgpaFilter, setAspirantCgpaFilter] = useState('all');
+  const [aspirantPlacedFilter, setAspirantPlacedFilter] = useState('all');
+  const [aspirantSearch, setAspirantSearch] = useState('');
+
+  // Unwillingness Form Builder State
   const [unwillingnessForm, setUnwillingnessForm] = useState(null);
   const [unwillingnessSubmissions, setUnwillingnessSubmissions] = useState([]);
   const [loadingUnwillingness, setLoadingUnwillingness] = useState(false);
   const [unwillingnessDeptFilter, setUnwillingnessDeptFilter] = useState('all');
   const [unwillingnessTypeFilter, setUnwillingnessTypeFilter] = useState('all');
+  const [showUnwillingnessBuilder, setShowUnwillingnessBuilder] = useState(false);
+  const [unwillingnessBuilderForm, setUnwillingnessBuilderForm] = useState({
+    title: 'Placement Unwillingness Undertaking & Documentation Form',
+    instructions: 'Mandatory undertaking for students opting for Higher Studies or Entrepreneurship instead of campus placement. Upload your signed undertaking form.',
+    sampleDocumentUrl: '',
+    deadline: '',
+  });
+  const [savingUnwillingnessForm, setSavingUnwillingnessForm] = useState(false);
+
+  // Excel 1 Dept Filter
+  const [excel1Dept, setExcel1Dept] = useState('all');
 
   // Communication 3-Channels State
   const [selectedChannel, setSelectedChannel] = useState('general'); // general | drive_announcements | drive_queries
@@ -265,22 +287,75 @@ export default function PlacementDashboard({ user }) {
     }
   };
 
-  // Create Drive Handler
+  // Create / Edit Drive Handler
   const handleCreateDrive = async (e) => {
     e.preventDefault();
     try {
-      const res = await placementAPI.createDrive(driveForm);
+      let res;
+      if (editingDrive) {
+        res = await placementAPI.updateDrive(editingDrive._id, driveForm);
+      } else {
+        res = await placementAPI.createDrive(driveForm);
+      }
+
       if (res.data.success) {
         setShowCreateDriveModal(false);
+        setEditingDrive(null);
         loadDrives();
         Swal.fire({
           icon: 'success',
-          title: 'Placement Drive Posted!',
-          html: `<p><strong>${res.data.drive.companyName}</strong> has been published.</p><p class="small text-muted">Channel 2 (Announcements) and Channel 3 (Queries) have been automatically initialized.</p>`,
+          title: editingDrive ? 'Drive Updated!' : 'Placement Drive Posted!',
+          text: `${driveForm.companyName} has been ${editingDrive ? 'updated' : 'published'} successfully.`,
         });
       }
     } catch (err) {
-      Swal.fire('Error', err.response?.data?.message || 'Failed to create drive', 'error');
+      Swal.fire('Error', err.response?.data?.message || 'Failed to save drive', 'error');
+    }
+  };
+
+  const handleOpenEditDrive = (drive) => {
+    setEditingDrive(drive);
+    setDriveForm({
+      companyName: drive.companyName || '',
+      jobLocation: drive.jobLocation || '',
+      companyDescription: drive.companyDescription || '',
+      eligibleDepartments: drive.eligibleDepartments || ['CSE', 'IT', 'ECE', 'EEE', 'MECH', 'CIVIL', 'AIDS'],
+      offerType: drive.offerType || 'Full Time',
+      internshipDurationMonths: drive.internshipDurationMonths || 0,
+      stipend: drive.stipend || '',
+      minCGPA: drive.minCGPA || 0,
+      standingArrearsAllowed: drive.standingArrearsAllowed || false,
+      maxStandingArrears: drive.maxStandingArrears || 0,
+      historyArrearsAllowed: drive.historyArrearsAllowed || false,
+      maxHistoryArrears: drive.maxHistoryArrears || 0,
+      optInDeadline: drive.optInDeadline ? drive.optInDeadline.substring(0, 16) : '',
+      roles: drive.roles?.length > 0 ? drive.roles : [
+        { roleName: 'Associate Software Engineer', ctc: '7 LPA', minCGPA: 6.5 }
+      ],
+    });
+    setShowCreateDriveModal(true);
+  };
+
+  const handleDeleteDrive = async (driveId, companyName) => {
+    const confirm = await Swal.fire({
+      title: `Delete ${companyName}?`,
+      text: 'Are you sure you want to delete this placement drive? All opt-ins and round evaluations will be removed.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      confirmButtonText: 'Yes, Delete Drive',
+    });
+
+    if (confirm.isConfirmed) {
+      try {
+        const res = await placementAPI.deleteDrive(driveId);
+        if (res.data.success) {
+          Swal.fire('Deleted', res.data.message || 'Drive deleted successfully.', 'success');
+          loadDrives();
+        }
+      } catch (err) {
+        Swal.fire('Error', err.response?.data?.message || 'Failed to delete drive', 'error');
+      }
     }
   };
 
@@ -288,10 +363,12 @@ export default function PlacementDashboard({ user }) {
   const handleOpenEvaluations = async (drive) => {
     setActiveDriveForEvaluations(drive);
     setLoadingEvaluations(true);
+    setShowRoundsEditor(false);
     try {
       const res = await placementAPI.getEvaluations(drive._id);
       if (res.data.success) {
         setEvaluationData(res.data);
+        setEditableRounds(res.data.rounds || drive.rounds || []);
       }
     } catch (err) {
       Swal.fire('Error', 'Failed to load round evaluations', 'error');
@@ -300,18 +377,86 @@ export default function PlacementDashboard({ user }) {
     }
   };
 
-  // Update a Student Round Evaluation
-  const handleUpdateStudentRound = async (studentId, roundNumber, status, isFinal = false) => {
+  // Save Dynamic Rounds of Drive
+  const handleSaveDynamicRounds = async () => {
     if (!activeDriveForEvaluations) return;
+    if (editableRounds.length === 0) {
+      Swal.fire('Required', 'At least one round is required.', 'warning');
+      return;
+    }
+
+    setSavingRounds(true);
+    try {
+      const res = await placementAPI.updateDriveRounds(activeDriveForEvaluations._id, {
+        rounds: editableRounds,
+      });
+      if (res.data.success) {
+        setEvaluationData({
+          ...evaluationData,
+          rounds: res.data.rounds,
+          evaluations: res.data.evaluations,
+        });
+        setShowRoundsEditor(false);
+        Swal.fire({
+          icon: 'success',
+          title: 'Rounds Synchronized',
+          text: 'Drive rounds updated and synchronized across all candidate evaluations.',
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
+    } catch (err) {
+      Swal.fire('Error', err.response?.data?.message || 'Failed to save rounds', 'error');
+    } finally {
+      setSavingRounds(false);
+    }
+  };
+
+  // Update a Student Round Evaluation
+  const handleUpdateStudentRound = async (studentId, roundNumber, status, isFinal = false, defaultRole = '', defaultCTC = '') => {
+    if (!activeDriveForEvaluations) return;
+
+    let placedRole = defaultRole;
+    let placedCTC = defaultCTC;
+
+    if (status === 'Placed') {
+      const { value: formValues } = await Swal.fire({
+        title: 'Mark Student as Placed',
+        html: `
+          <div class="text-start mb-2">
+            <label class="form-label small fw-semibold text-muted">Job Role Offered</label>
+            <input id="swal-role" class="form-control form-control-sm" value="${defaultRole || activeDriveForEvaluations.roles?.[0]?.roleName || 'Software Engineer'}" />
+          </div>
+          <div class="text-start">
+            <label class="form-label small fw-semibold text-muted">Package CTC (LPA)</label>
+            <input id="swal-ctc" class="form-control form-control-sm" value="${defaultCTC || activeDriveForEvaluations.roles?.[0]?.ctc || '7.5 LPA'}" />
+          </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Confirm Placement',
+        preConfirm: () => {
+          return [
+            document.getElementById('swal-role').value,
+            document.getElementById('swal-ctc').value,
+          ];
+        },
+      });
+
+      if (!formValues) return;
+      [placedRole, placedCTC] = formValues;
+    }
+
     try {
       const res = await placementAPI.updateEvaluation(activeDriveForEvaluations._id, {
         studentId,
         roundNumber,
         status,
         isFinalRound: isFinal,
+        placedRole,
+        placedCTC,
       });
       if (res.data.success) {
-        // Refresh local evaluation state
         const updatedRes = await placementAPI.getEvaluations(activeDriveForEvaluations._id);
         if (updatedRes.data.success) {
           setEvaluationData(updatedRes.data);
@@ -319,13 +464,35 @@ export default function PlacementDashboard({ user }) {
         Swal.fire({
           icon: 'success',
           title: 'Evaluation Updated',
-          text: `Outcome marked as ${status}. Cascades and student notifications triggered.`,
+          text: `Outcome marked as ${status}. Dynamic Excels updated.`,
           timer: 1500,
           showConfirmButton: false,
         });
       }
     } catch (err) {
       Swal.fire('Error', err.response?.data?.message || 'Update failed', 'error');
+    }
+  };
+
+  // Save Custom Unwillingness Form Builder
+  const handleSaveUnwillingnessForm = async (e) => {
+    e.preventDefault();
+    setSavingUnwillingnessForm(true);
+    try {
+      const res = await placementAPI.saveUnwillingnessForm(unwillingnessBuilderForm);
+      if (res.data.success) {
+        setUnwillingnessForm(res.data.form);
+        setShowUnwillingnessBuilder(false);
+        Swal.fire({
+          icon: 'success',
+          title: 'Unwillingness Form Updated',
+          text: 'New instructions and undertaking template published for non-placement students.',
+        });
+      }
+    } catch (err) {
+      Swal.fire('Error', err.response?.data?.message || 'Failed to save form settings', 'error');
+    } finally {
+      setSavingUnwillingnessForm(false);
     }
   };
 
@@ -485,7 +652,7 @@ export default function PlacementDashboard({ user }) {
               className={`btn ${activeTab === 'communication' ? 'btn-primary' : 'btn-outline-secondary'}`}
               onClick={() => setActiveTab('communication')}
             >
-              <i className="bi bi-chat-left-dots-fill me-1"></i> 3-Channel Communication
+              <i className="bi bi-chat-left-dots-fill me-1"></i> Communication
             </button>
             <button
               className={`btn ${activeTab === 'tickets' ? 'btn-primary' : 'btn-outline-secondary'}`}
@@ -503,13 +670,15 @@ export default function PlacementDashboard({ user }) {
             >
               <i className="bi bi-gear-fill me-1"></i> Criteria Policy {policy && !policy.isConfigured && <span className="badge bg-danger ms-1">Pending</span>}
             </button>
-            <button
-              className="btn btn-sm btn-outline-primary"
-              onClick={() => setShowFloatingWindow(!showFloatingWindow)}
-              title="Toggle Student Records Floating Window"
-            >
-              <i className="bi bi-window-stack me-1"></i> Student Records Window
-            </button>
+            {activeTab === 'analytics' && (
+              <button
+                className="btn btn-sm btn-outline-primary"
+                onClick={() => setShowFloatingWindow(!showFloatingWindow)}
+                title="Toggle Student Records Floating Window"
+              >
+                <i className="bi bi-window-stack me-1"></i> Student Records Window
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -578,21 +747,29 @@ export default function PlacementDashboard({ user }) {
                 <h6 className="fw-bold mb-0 text-slate-800">
                   <i className="bi bi-funnel-fill text-primary me-2"></i> Placement Intelligence Filters
                 </h6>
-                <button
-                  className="btn btn-outline-secondary btn-sm"
-                  onClick={() => {
-                    setFilterBatch('2023-2027');
-                    setFilterDept('all');
-                    setFilterCgpa('all');
-                    setFilterPlaced('all');
-                    setFilterPlacementType('all');
-                    setFilterArrears('all');
-                    setFilterSearch('');
-                    loadAnalytics();
-                  }}
-                >
-                  <i className="bi bi-arrow-counterclockwise me-1"></i> Reset Filters
-                </button>
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    className="btn btn-primary btn-sm fw-semibold"
+                    onClick={loadAnalytics}
+                  >
+                    <i className="bi bi-funnel-fill me-1"></i> Apply Filters
+                  </button>
+                  <button
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={() => {
+                      setFilterBatch('2023-2027');
+                      setFilterDept('all');
+                      setFilterCgpa('all');
+                      setFilterPlaced('all');
+                      setFilterPlacementType('all');
+                      setFilterArrears('all');
+                      setFilterSearch('');
+                      loadAnalytics();
+                    }}
+                  >
+                    <i className="bi bi-arrow-counterclockwise me-1"></i> Reset Filters
+                  </button>
+                </div>
               </div>
               <div className="card-body p-3 bg-light">
                 <div className="row g-2">
@@ -794,19 +971,25 @@ export default function PlacementDashboard({ user }) {
                             </span>
                             <div className="btn-group btn-group-sm">
                               <button
-                                className="btn btn-outline-primary"
+                                className="btn btn-primary"
                                 onClick={() => handleOpenEvaluations(d)}
                               >
                                 <i className="bi bi-list-check me-1"></i> Rounds Evaluator
                               </button>
-                              <a
-                                href={`/api/placement/drives/${d._id}/export-excel`}
-                                download
-                                className="btn btn-outline-success"
-                                title="Download Excel 1: Drive & Round-Level Analysis"
+                              <button
+                                className="btn btn-outline-secondary"
+                                onClick={() => handleOpenEditDrive(d)}
+                                title="Edit Drive Details"
                               >
-                                <i className="bi bi-file-earmark-excel"></i> Excel 1
-                              </a>
+                                <i className="bi bi-pencil"></i> Edit
+                              </button>
+                              <button
+                                className="btn btn-outline-danger"
+                                onClick={() => handleDeleteDrive(d._id, d.companyName)}
+                                title="Delete Drive"
+                              >
+                                <i className="bi bi-trash"></i>
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -836,6 +1019,70 @@ export default function PlacementDashboard({ user }) {
               </button>
             </div>
 
+            {/* Aspirants Filter Controls */}
+            <div className="card-body p-3 bg-light border-bottom">
+              <div className="row g-2">
+                <div className="col-6 col-md-3">
+                  <select
+                    className="form-select form-select-sm"
+                    value={aspirantDeptFilter}
+                    onChange={(e) => setAspirantDeptFilter(e.target.value)}
+                  >
+                    <option value="all">All Departments</option>
+                    {DEPARTMENT_OPTIONS.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-6 col-md-2">
+                  <select
+                    className="form-select form-select-sm"
+                    value={aspirantCgpaFilter}
+                    onChange={(e) => setAspirantCgpaFilter(e.target.value)}
+                  >
+                    <option value="all">All CGPA</option>
+                    <option value="9">&ge; 9.0 CGPA</option>
+                    <option value="8">&ge; 8.0 CGPA</option>
+                    <option value="7">&ge; 7.0 CGPA</option>
+                    <option value="6">&ge; 6.0 CGPA</option>
+                  </select>
+                </div>
+                <div className="col-6 col-md-2">
+                  <select
+                    className="form-select form-select-sm"
+                    value={aspirantPlacedFilter}
+                    onChange={(e) => setAspirantPlacedFilter(e.target.value)}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="placed">Placed Only</option>
+                    <option value="unplaced">Unplaced Only</option>
+                  </select>
+                </div>
+                <div className="col-12 col-md-3">
+                  <input
+                    type="text"
+                    className="form-control form-control-sm"
+                    placeholder="Search Roll #, Name..."
+                    value={aspirantSearch}
+                    onChange={(e) => setAspirantSearch(e.target.value)}
+                  />
+                </div>
+                <div className="col-12 col-md-2 text-end">
+                  <button
+                    className="btn btn-sm btn-outline-secondary w-100"
+                    onClick={() => {
+                      setAspirantDeptFilter('all');
+                      setAspirantCgpaFilter('all');
+                      setAspirantPlacedFilter('all');
+                      setAspirantSearch('');
+                    }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="table-responsive">
               <table className="table table-hover align-middle mb-0">
                 <thead className="table-light text-muted small text-uppercase">
@@ -851,10 +1098,25 @@ export default function PlacementDashboard({ user }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(analytics?.students || []).length === 0 ? (
-                    <tr><td colSpan="8" className="text-center py-5 text-muted">No placement aspirants found.</td></tr>
-                  ) : (
-                    analytics.students.map((st) => (
+                  {(() => {
+                    const filteredAspirants = (analytics?.students || []).filter((st) => {
+                      if (aspirantDeptFilter !== 'all' && (st.department || '').toUpperCase() !== aspirantDeptFilter.toUpperCase()) return false;
+                      if (aspirantCgpaFilter !== 'all' && (st.currentCGPA || 0) < Number(aspirantCgpaFilter)) return false;
+                      if (aspirantPlacedFilter === 'placed' && !st.placementStatus?.isPlaced && st.isPlaced !== 'Yes') return false;
+                      if (aspirantPlacedFilter === 'unplaced' && (st.placementStatus?.isPlaced || st.isPlaced === 'Yes')) return false;
+                      if (aspirantSearch.trim()) {
+                        const q = aspirantSearch.trim().toLowerCase();
+                        const match = (st.name || '').toLowerCase().includes(q) || (st.rollNumber || '').toLowerCase().includes(q);
+                        if (!match) return false;
+                      }
+                      return true;
+                    });
+
+                    if (filteredAspirants.length === 0) {
+                      return <tr><td colSpan="8" className="text-center py-5 text-muted">No placement aspirants found matching filters.</td></tr>;
+                    }
+
+                    return filteredAspirants.map((st) => (
                       <tr key={st._id}>
                         <td className="fw-bold font-monospace text-primary">{st.rollNumber}</td>
                         <td className="fw-semibold text-dark">{st.name}</td>
@@ -866,13 +1128,13 @@ export default function PlacementDashboard({ user }) {
                           </span>
                         </td>
                         <td>
-                          <span className={`badge ${st.placementStatus?.isPlaced ? 'bg-success' : 'bg-secondary'}`}>
-                            {st.placementStatus?.isPlaced ? 'Placed' : 'Unplaced'}
+                          <span className={`badge ${st.placementStatus?.isPlaced || st.isPlaced === 'Yes' ? 'bg-success' : 'bg-secondary'}`}>
+                            {st.placementStatus?.isPlaced || st.isPlaced === 'Yes' ? 'Placed' : 'Unplaced'}
                           </span>
                         </td>
                         <td className="small">
-                          {st.placementStatus?.isPlaced
-                            ? `${st.placementStatus.companyName} (${st.placementStatus.packageCTC} LPA)`
+                          {st.placementStatus?.isPlaced || st.isPlaced === 'Yes'
+                            ? `${st.placementStatus?.companyName || st.placedCompany} (${st.placementStatus?.packageCTC || st.salaryPackage} LPA)`
                             : '-'}
                         </td>
                         <td className="text-end">
@@ -884,8 +1146,8 @@ export default function PlacementDashboard({ user }) {
                           </button>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -906,8 +1168,14 @@ export default function PlacementDashboard({ user }) {
                   <small className="text-muted">Mandatory undertakings from students opting for Higher Studies or Entrepreneurship. Choices are locked until explicitly unlocked.</small>
                 </div>
                 <div className="d-flex gap-2">
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setShowUnwillingnessBuilder(!showUnwillingnessBuilder)}
+                  >
+                    <i className="bi bi-pencil-square me-1"></i> Form Builder & Guidelines
+                  </button>
                   <a
-                    href="/api/placement/unwillingness/export-excel"
+                    href="/api/excels/5-unwillingness-and-placed"
                     download
                     className="btn btn-outline-success btn-sm"
                   >
@@ -918,6 +1186,65 @@ export default function PlacementDashboard({ user }) {
                   </button>
                 </div>
               </div>
+
+              {/* Form Customization Builder Panel */}
+              {showUnwillingnessBuilder && (
+                <div className="p-4 bg-light border-bottom animate__animated animate__fadeIn">
+                  <h6 className="fw-bold text-primary mb-3">
+                    <i className="bi bi-sliders me-1"></i> Placement Unwillingness Undertaking Form Configuration
+                  </h6>
+                  <form onSubmit={handleSaveUnwillingnessForm}>
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <label className="form-label small fw-semibold">Form Title *</label>
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          value={unwillingnessBuilderForm.title}
+                          onChange={(e) => setUnwillingnessBuilderForm({ ...unwillingnessBuilderForm, title: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label small fw-semibold">Sample Blank Form Document URL</label>
+                        <input
+                          type="url"
+                          className="form-control form-control-sm"
+                          placeholder="https://institution.edu/forms/undertaking.pdf"
+                          value={unwillingnessBuilderForm.sampleDocumentUrl}
+                          onChange={(e) => setUnwillingnessBuilderForm({ ...unwillingnessBuilderForm, sampleDocumentUrl: e.target.value })}
+                        />
+                      </div>
+                      <div className="col-12">
+                        <label className="form-label small fw-semibold">Instructions for Students *</label>
+                        <textarea
+                          className="form-control form-control-sm"
+                          rows="2"
+                          value={unwillingnessBuilderForm.instructions}
+                          onChange={(e) => setUnwillingnessBuilderForm({ ...unwillingnessBuilderForm, instructions: e.target.value })}
+                          required
+                        ></textarea>
+                      </div>
+                    </div>
+                    <div className="text-end mt-3">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm me-2"
+                        onClick={() => setShowUnwillingnessBuilder(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn btn-success btn-sm fw-semibold"
+                        disabled={savingUnwillingnessForm}
+                      >
+                        {savingUnwillingnessForm ? 'Publishing...' : 'Save & Publish Guidelines'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
 
               {/* Submissions Filter */}
               <div className="p-3 bg-light border-bottom">
@@ -1018,318 +1345,217 @@ export default function PlacementDashboard({ user }) {
         )}
 
         {/* ======================================================== */}
-        {/* TAB 5: TWO DRIVES EXCELS & TRACKING CENTER */}
+        {/* TAB 5: 5 INSTITUTIONAL SYSTEM EXCELS CENTER */}
         {/* ======================================================== */}
         {activeTab === 'excels' && (
           <div className="space-y-4">
-            <div className="row g-4">
-              {/* EXCEL 2 CARD: Master Tracking Excel */}
-              <div className="col-12 col-md-6">
-                <div className="card shadow-sm border-0 rounded-3 p-4 bg-white h-100">
-                  <div className="d-flex align-items-center mb-3">
-                    <div className="bg-success-subtle p-3 rounded-circle text-success me-3">
-                      <i className="bi bi-table fs-3"></i>
-                    </div>
-                    <div>
-                      <h5 className="fw-bold text-dark mb-1">Excel 2: Master Placement Tracking</h5>
-                      <small className="text-muted">Multi-department sheets with full company matrix & absent counts</small>
-                    </div>
-                  </div>
-                  <p className="text-muted small">
-                    Contains a dedicated sheet for each department (CSE, IT, ECE, MECH, etc.). Lists each company drive with roles, CTC, dates, and student statuses ('Eligible & Opted', 'Eligible - Not Opted', '-', 'Placed'). Features auto-calculated summary columns for Total Eligible Drives, Total Opted Drives, and Total Absent Count.
-                  </p>
-                  <a
-                    href="/api/placement/export-master-tracking"
-                    download
-                    className="btn btn-success w-100 py-2 mt-auto"
-                  >
-                    <i className="bi bi-download me-2"></i> Download Master Tracking Excel
-                  </a>
-                </div>
-              </div>
-
-              {/* UNWILLINGNESS EXCEL CARD */}
-              <div className="col-12 col-md-6">
-                <div className="card shadow-sm border-0 rounded-3 p-4 bg-white h-100">
-                  <div className="d-flex align-items-center mb-3">
-                    <div className="bg-info-subtle p-3 rounded-circle text-info me-3">
-                      <i className="bi bi-file-earmark-lock-fill fs-3 text-primary"></i>
-                    </div>
-                    <div>
-                      <h5 className="fw-bold text-dark mb-1">Unwillingness Undertakings Excel</h5>
-                      <small className="text-muted">Higher Studies & Entrepreneurship Records</small>
-                    </div>
-                  </div>
-                  <p className="text-muted small">
-                    Exports all submitted unwillingness undertakings arranged department-wise, categorized strictly into Higher Studies and Entrepreneurship, and sorted alphabetically by Roll Number.
-                  </p>
-                  <a
-                    href="/api/placement/unwillingness/export-excel"
-                    download
-                    className="btn btn-primary w-100 py-2 mt-auto"
-                  >
-                    <i className="bi bi-download me-2"></i> Download Unwillingness Excel
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* EXCEL 1 PER-DRIVE DOWNLOAD SECTION */}
-            <div className="card shadow-sm border-0 rounded-3 mt-4">
+            <div className="card shadow-sm border-0 rounded-3 mb-4">
               <div className="card-header bg-white py-3 border-bottom">
-                <h6 className="fw-bold mb-0 text-slate-800">
-                  <i className="bi bi-file-earmark-ruled-fill text-success me-2"></i> Excel 1: Drive-Specific & Round-Level Analysis Excels
-                </h6>
+                <h5 className="fw-bold mb-1 text-slate-800 d-flex align-items-center gap-2">
+                  <i className="bi bi-file-earmark-spreadsheet-fill text-success"></i>
+                  Institutional System Excels Center
+                </h5>
+                <small className="text-muted">
+                  5 Dynamic System Excels reflecting real-time database updates, sorted by Roll Number ascending.
+                </small>
               </div>
-              <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0">
-                  <thead className="table-light text-muted small text-uppercase">
-                    <tr>
-                      <th>Company Name</th>
-                      <th>Offer Type</th>
-                      <th>Eligible Depts</th>
-                      <th>Opted-In Count</th>
-                      <th className="text-end">Download Excel 1</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {drivesList.map((d) => (
-                      <tr key={d._id}>
-                        <td className="fw-bold text-dark">{d.companyName}</td>
-                        <td><span className="badge bg-primary-subtle text-primary border">{d.offerType}</span></td>
-                        <td className="small text-muted">{(d.eligibleDepartments || []).join(', ')}</td>
-                        <td>{(d.optIns || []).filter((o) => o.status === 'Opted-In').length} students</td>
-                        <td className="text-end">
-                          <a
-                            href={`/api/placement/drives/${d._id}/export-excel`}
-                            download
-                            className="btn btn-sm btn-outline-success"
+
+              <div className="card-body p-4">
+                <div className="row g-4">
+                  {/* EXCEL 1: QS I-GAUGE DATA 2025-26 */}
+                  <div className="col-12 col-lg-6">
+                    <div className="card shadow-sm border rounded-3 p-3 bg-white h-100 d-flex flex-column">
+                      <div className="d-flex align-items-center mb-3">
+                        <div className="bg-success-subtle p-3 rounded-circle text-success me-3">
+                          <i className="bi bi-file-earmark-check-fill fs-3"></i>
+                        </div>
+                        <div>
+                          <h6 className="fw-bold text-dark mb-0">Excel 1: QS I-Gauge Data 2025-26</h6>
+                          <small className="text-muted">Exact template with Placement 1 & 2, Entrepreneurship & Higher Studies</small>
+                        </div>
+                      </div>
+                      <p className="small text-secondary mb-3">
+                        Official QS I-Gauge return format with 19 standardized columns. Combines placement salary packages, designation, startup details, target PG/PhD programs, and mentor/coordinator remarks. Non-applicable fields are marked as 'NA'.
+                      </p>
+                      <div className="mt-auto">
+                        <div className="mb-2">
+                          <label className="form-label small text-muted mb-1">Department Filter:</label>
+                          <select
+                            className="form-select form-select-sm"
+                            value={excel1Dept}
+                            onChange={(e) => setExcel1Dept(e.target.value)}
                           >
-                            <i className="bi bi-download me-1"></i> Download Excel 1
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                            <option value="all">All College Departments</option>
+                            {DEPARTMENT_OPTIONS.map((d) => (
+                              <option key={d} value={d}>{d}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <a
+                          href={`/api/excels/1-qs-gauge?department=${excel1Dept}`}
+                          download
+                          className="btn btn-success btn-sm w-100 fw-semibold"
+                        >
+                          <i className="bi bi-download me-1"></i> Download QS I-Gauge Excel (Excel 1)
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EXCEL 2: CUSTOM FILTERED EXCEL */}
+                  <div className="col-12 col-lg-6">
+                    <div className="card shadow-sm border rounded-3 p-3 bg-white h-100 d-flex flex-column">
+                      <div className="d-flex align-items-center mb-3">
+                        <div className="bg-primary-subtle p-3 rounded-circle text-primary me-3">
+                          <i className="bi bi-sliders fs-3"></i>
+                        </div>
+                        <div>
+                          <h6 className="fw-bold text-dark mb-0">Excel 2: Custom Filtered Export</h6>
+                          <small className="text-muted">Filtered student records with active dashboard filter criteria</small>
+                        </div>
+                      </div>
+                      <p className="small text-secondary mb-3">
+                        Exports student profiles matching your current filters (Batch: {filterBatch}, Dept: {filterDept}, CGPA: {filterCgpa}, Status: {filterPlaced}). Customizable column selection with 'NA' for missing attributes.
+                      </p>
+                      <div className="mt-auto">
+                        <button
+                          className="btn btn-primary btn-sm w-100 fw-semibold"
+                          onClick={() => {
+                            excelAPI.downloadExcel2_Custom({
+                              department: filterDept,
+                              cgpaMin: filterCgpa === '9-10' ? 9 : filterCgpa === '8-8.99' ? 8 : 0,
+                              isPlaced: filterPlaced,
+                              search: filterSearch,
+                            }).then((res) => {
+                              const url = window.URL.createObjectURL(new Blob([res.data]));
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.setAttribute('download', `Custom_Filtered_Students_${Date.now()}.xlsx`);
+                              document.body.appendChild(link);
+                              link.click();
+                            });
+                          }}
+                        >
+                          <i className="bi bi-download me-1"></i> Download Filtered Records (Excel 2)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EXCEL 3: EACH DRIVE DETAIL WORKBOOK */}
+                  <div className="col-12 col-lg-4">
+                    <div className="card shadow-sm border rounded-3 p-3 bg-white h-100 d-flex flex-column">
+                      <div className="d-flex align-items-center mb-3">
+                        <div className="bg-info-subtle p-3 rounded-circle text-info me-3">
+                          <i className="bi bi-folder2-open fs-3 text-info"></i>
+                        </div>
+                        <div>
+                          <h6 className="fw-bold text-dark mb-0">Excel 3: Drive Detail Workbook</h6>
+                          <small className="text-muted">Separate sheet per drive</small>
+                        </div>
+                      </div>
+                      <p className="small text-secondary mb-3">
+                        Multi-sheet workbook containing each drive in a dedicated sheet named after the drive. Maintains eligible students with opt-in status (Opted-In, Opted-Out, Removed, Blocked) and round evaluations.
+                      </p>
+                      <div className="mt-auto">
+                        <a
+                          href="/api/excels/3-drives-detail"
+                          download
+                          className="btn btn-outline-primary btn-sm w-100 fw-semibold"
+                        >
+                          <i className="bi bi-download me-1"></i> Download Drives Workbook (Excel 3)
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EXCEL 4: MASTER PLACEMENT MATRIX */}
+                  <div className="col-12 col-lg-4">
+                    <div className="card shadow-sm border rounded-3 p-3 bg-white h-100 d-flex flex-column">
+                      <div className="d-flex align-items-center mb-3">
+                        <div className="bg-warning-subtle p-3 rounded-circle text-warning me-3">
+                          <i className="bi bi-grid-3x3-gap-fill fs-3 text-warning"></i>
+                        </div>
+                        <div>
+                          <h6 className="fw-bold text-dark mb-0">Excel 4: Master Placement Matrix</h6>
+                          <small className="text-muted">Drives on X-axis, students on Y-axis</small>
+                        </div>
+                      </div>
+                      <p className="small text-secondary mb-3">
+                        Comprehensive matrix for placement-opted students. Y-axis: Roll Number, Name, Dept, Email. X-axis: All recruitment drives with Eligible/Not, Opted/Not, Placed/Not, and CTC package.
+                      </p>
+                      <div className="mt-auto">
+                        <a
+                          href="/api/excels/4-master-tracking"
+                          download
+                          className="btn btn-outline-warning btn-sm w-100 fw-semibold text-dark"
+                        >
+                          <i className="bi bi-download me-1"></i> Download Master Matrix (Excel 4)
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EXCEL 5: UNWILLINGNESS & PLACED WORKBOOK */}
+                  <div className="col-12 col-lg-4">
+                    <div className="card shadow-sm border rounded-3 p-3 bg-white h-100 d-flex flex-column">
+                      <div className="d-flex align-items-center mb-3">
+                        <div className="bg-danger-subtle p-3 rounded-circle text-danger me-3">
+                          <i className="bi bi-layers-fill fs-3 text-danger"></i>
+                        </div>
+                        <div>
+                          <h6 className="fw-bold text-dark mb-0">Excel 5: Unwillingness & Placed</h6>
+                          <small className="text-muted">Dual-sheet institutional register</small>
+                        </div>
+                      </div>
+                      <p className="small text-secondary mb-3">
+                        Sheet 1: Unwillingness records for Higher Studies and Entrepreneurship students. Sheet 2: Detailed placement records (company, role, CTC, on/off campus, offer types) for placed students.
+                      </p>
+                      <div className="mt-auto">
+                        <a
+                          href="/api/excels/5-unwillingness-and-placed"
+                          download
+                          className="btn btn-outline-danger btn-sm w-100 fw-semibold"
+                        >
+                          <i className="bi bi-download me-1"></i> Download Dual Register (Excel 5)
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         )}
 
         {/* ======================================================== */}
-        {/* TAB 6: 3-CHANNEL COMMUNICATION HUB */}
+        {/* TAB 6: CENTRALIZED COMMUNICATION HUB */}
         {/* ======================================================== */}
         {activeTab === 'communication' && (
-          <div className="space-y-4">
-            <div className="card shadow-sm border-0 rounded-3">
-              {/* Channel Selector Header */}
-              <div className="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-                <div className="btn-group btn-group-sm">
-                  <button
-                    className={`btn ${selectedChannel === 'general' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                    onClick={() => setSelectedChannel('general')}
-                  >
-                    Channel 1: General Messaging
-                  </button>
-                  <button
-                    className={`btn ${selectedChannel === 'drive_announcements' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                    onClick={() => setSelectedChannel('drive_announcements')}
-                  >
-                    Channel 2: Drive Announcements (Read-Only)
-                  </button>
-                  <button
-                    className={`btn ${selectedChannel === 'drive_queries' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                    onClick={() => setSelectedChannel('drive_queries')}
-                  >
-                    Channel 3: Drive Queries & Q&A
-                  </button>
-                </div>
-                <button className="btn btn-outline-secondary btn-sm" onClick={loadChannelMessages}>
-                  <i className="bi bi-arrow-clockwise me-1"></i> Refresh
-                </button>
-              </div>
-
-              {/* Compose New Message / Announcement Form */}
-              <div className="p-3 bg-light border-bottom">
-                <h6 className="fw-bold text-dark mb-2">
-                  <i className="bi bi-pencil-square text-primary me-1"></i> Post to {selectedChannel.replace('_', ' ').toUpperCase()}
-                </h6>
-                <form onSubmit={handleSendMessage} className="space-y-2">
-                  <div className="row g-2 mb-2">
-                    <div className="col-12 col-md-8">
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="Subject / Title..."
-                        value={newMsgSubject}
-                        onChange={(e) => setNewMsgSubject(e.target.value)}
-                        required
-                      />
-                    </div>
-                    {selectedChannel !== 'general' && (
-                      <div className="col-12 col-md-4">
-                        <select
-                          className="form-select form-select-sm"
-                          value={newMsgDriveId}
-                          onChange={(e) => setNewMsgDriveId(e.target.value)}
-                        >
-                          <option value="">Associated Placement Drive (Optional)</option>
-                          {drivesList.map((d) => (
-                            <option key={d._id} value={d._id}>{d.companyName}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                  <textarea
-                    className="form-control form-control-sm mb-2"
-                    rows="3"
-                    placeholder="Content of announcement or message..."
-                    value={newMsgContent}
-                    onChange={(e) => setNewMsgContent(e.target.value)}
-                    required
-                  ></textarea>
-                  <div className="text-end">
-                    <button type="submit" className="btn btn-primary btn-sm px-4">
-                      Broadcast to Channel
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Messages Feed */}
-              <div className="p-3">
-                {loadingMessages ? (
-                  <div className="text-center py-5 text-muted">Loading messages...</div>
-                ) : channelMessages.length === 0 ? (
-                  <div className="text-center py-5 text-muted">No messages posted in this channel yet.</div>
-                ) : (
-                  <div className="space-y-3">
-                    {channelMessages.map((msg) => (
-                      <div key={msg._id} className="card shadow-sm border rounded p-3 bg-white mb-3">
-                        <div className="d-flex justify-content-between align-items-baseline mb-2">
-                          <h6 className="fw-bold text-dark mb-0">{msg.subject}</h6>
-                          <span className="small text-muted">{new Date(msg.createdAt).toLocaleString()}</span>
-                        </div>
-                        <div className="small text-muted mb-2">
-                          From: <strong>{msg.sender.name}</strong> ({msg.sender.role})
-                        </div>
-                        <p className="small text-secondary mb-3" style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</p>
-
-                        {/* Thread Replies */}
-                        <div className="bg-light p-2 rounded mb-2">
-                          <small className="fw-bold text-dark d-block mb-1">Replies ({(msg.replies || []).length}):</small>
-                          {(msg.replies || []).map((rep, rIdx) => (
-                            <div key={rIdx} className="border-bottom py-1 small">
-                              <strong>{rep.senderName} ({rep.senderRole}):</strong> {rep.content}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Reply Form */}
-                        <div className="input-group input-group-sm">
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Type a reply to this thread..."
-                            value={replyTextMap[msg._id] || ''}
-                            onChange={(e) => setReplyTextMap({ ...replyTextMap, [msg._id]: e.target.value })}
-                            onKeyDown={(e) => e.key === 'Enter' && handleReplyMessage(msg._id)}
-                          />
-                          <button className="btn btn-outline-primary" onClick={() => handleReplyMessage(msg._id)}>
-                            Reply
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <CommunicationHub user={currentUser} />
         )}
 
         {/* ======================================================== */}
-        {/* TAB 7: SUPPORT & FEATURE TICKETS */}
+        {/* TAB 7: SUPPORT DESK (TICKETS) */}
         {/* ======================================================== */}
         {activeTab === 'tickets' && (
-          <div className="space-y-4">
-            <div className="card shadow-sm border-0 rounded-3">
-              <div className="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                <div>
-                  <h5 className="fw-bold mb-0 text-slate-800">
-                    <i className="bi bi-ticket-perforated-fill text-primary me-2"></i> Support & Feature Requests
-                  </h5>
-                  <small className="text-muted">Raise tickets directly to Administration (both problem fixes and feature modifications are supported).</small>
-                </div>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowCreateTicketModal(true)}>
-                  <i className="bi bi-plus-lg me-1"></i> Raise Ticket
-                </button>
-              </div>
-
-              {/* Tickets Table */}
-              <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0">
-                  <thead className="table-light text-muted small text-uppercase">
-                    <tr>
-                      <th>Ticket #</th>
-                      <th>Type</th>
-                      <th>Subject & Description</th>
-                      <th>Priority</th>
-                      <th>Status</th>
-                      <th>Created</th>
-                      <th>Replies</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loadingTickets ? (
-                      <tr><td colSpan="7" className="text-center py-4 text-muted">Loading tickets...</td></tr>
-                    ) : ticketsList.length === 0 ? (
-                      <tr><td colSpan="7" className="text-center py-5 text-muted">No tickets raised yet.</td></tr>
-                    ) : (
-                      ticketsList.map((t) => (
-                        <tr key={t._id}>
-                          <td className="fw-bold font-monospace text-primary">{t.ticketNumber}</td>
-                          <td>
-                            <span className="badge bg-purple text-white" style={{ backgroundColor: '#7c3aed' }}>
-                              {t.ticketType === 'feature_modification' ? 'Feature Request' : 'Problem / Fix'}
-                            </span>
-                          </td>
-                          <td style={{ maxWidth: '300px' }}>
-                            <div className="fw-semibold text-dark">{t.subject}</div>
-                            <div className="small text-muted text-truncate">{t.description}</div>
-                          </td>
-                          <td><span className="badge bg-warning text-dark">{t.priority}</span></td>
-                          <td>
-                            <span className={`badge ${t.status === 'Open' ? 'bg-danger' : t.status === 'In Progress' ? 'bg-warning text-dark' : 'bg-success'}`}>
-                              {t.status}
-                            </span>
-                          </td>
-                          <td className="small text-muted">{new Date(t.createdAt).toLocaleDateString()}</td>
-                          <td className="small">{(t.replies || []).length} messages</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <TicketSupportCenter user={currentUser} />
         )}
 
       </div>
 
-      {/* FLOATING STUDENT RECORDS WINDOW */}
-      <FloatingCohortWindow
-        isOpen={showFloatingWindow}
-        onClose={() => setShowFloatingWindow(false)}
-        onOpen={() => setShowFloatingWindow(true)}
-        filteredStudents={analytics?.students || []}
-        cohortData={analytics?.students || []}
-        onViewStudent={(st) => setSelectedStudentForView(st)}
-        onSelectStudent={(idOrSt) => setSelectedStudentForView(idOrSt)}
-      />
+      {/* FLOATING STUDENT RECORDS WINDOW (ONLY VISIBLE ON DASHBOARD TAB) */}
+      {activeTab === 'analytics' && (
+        <FloatingCohortWindow
+          isOpen={showFloatingWindow}
+          onClose={() => setShowFloatingWindow(false)}
+          onOpen={() => setShowFloatingWindow(true)}
+          filteredStudents={analytics?.students || []}
+          cohortData={analytics?.students || []}
+          onViewStudent={(st) => setSelectedStudentForView(st)}
+          onSelectStudent={(idOrSt) => setSelectedStudentForView(idOrSt)}
+        />
+      )}
 
       {/* STUDENT PROFILE INSPECTOR MODAL */}
       {selectedStudentForView && (
@@ -1421,8 +1647,17 @@ export default function PlacementDashboard({ user }) {
           <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content shadow border-0" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
               <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title fw-bold">Create Campus Placement Drive</h5>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setShowCreateDriveModal(false)}></button>
+                <h5 className="modal-title fw-bold">
+                  {editingDrive ? 'Edit Placement Drive' : 'Create Campus Placement Drive'}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => {
+                    setShowCreateDriveModal(false);
+                    setEditingDrive(null);
+                  }}
+                ></button>
               </div>
               <form onSubmit={handleCreateDrive} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {/* Scrollable Modal Body */}
@@ -1604,11 +1839,18 @@ export default function PlacementDashboard({ user }) {
 
                 {/* Footer with Save Buttons */}
                 <div className="modal-footer bg-light" style={{ flexShrink: 0 }}>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCreateDriveModal(false)}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      setShowCreateDriveModal(false);
+                      setEditingDrive(null);
+                    }}
+                  >
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary btn-sm px-4">
-                    Create & Broadcast Drive
+                    {editingDrive ? 'Update Drive Details' : 'Create & Broadcast Drive'}
                   </button>
                 </div>
               </form>
@@ -1622,13 +1864,88 @@ export default function PlacementDashboard({ user }) {
         <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
           <div className="modal-dialog modal-dialog-centered modal-xl">
             <div className="modal-content shadow border-0" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-              <div className="modal-header bg-dark text-white">
+              <div className="modal-header bg-dark text-white d-flex justify-content-between align-items-center">
                 <div>
-                  <h5 className="modal-title fw-bold">Rounds Evaluator: {activeDriveForEvaluations.companyName}</h5>
-                  <span className="small opacity-75">Update round outcomes. Status defaults to Failed. Absent triggers cascade and proof request.</span>
+                  <h5 className="modal-title fw-bold mb-0">Rounds Evaluator: {activeDriveForEvaluations.companyName}</h5>
+                  <span className="small opacity-75">Update round outcomes. Add, modify or rename rounds dynamically.</span>
                 </div>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setActiveDriveForEvaluations(null)}></button>
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-outline-light btn-sm"
+                    onClick={() => setShowRoundsEditor(!showRoundsEditor)}
+                  >
+                    <i className="bi bi-gear-wide-connected me-1"></i> {showRoundsEditor ? 'Hide Rounds Editor' : 'Configure Rounds'}
+                  </button>
+                  <button type="button" className="btn-close btn-close-white" onClick={() => setActiveDriveForEvaluations(null)}></button>
+                </div>
               </div>
+
+              {/* Dynamic Rounds Configuration Sub-Panel */}
+              {showRoundsEditor && (
+                <div className="p-3 bg-light border-bottom animate__animated animate__fadeIn">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <h6 className="fw-bold text-primary mb-0 small">
+                      <i className="bi bi-diagram-3-fill me-1"></i> Add / Rename / Reorder Recruitment Rounds
+                    </h6>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={() => {
+                        const nextNum = editableRounds.length + 1;
+                        setEditableRounds([...editableRounds, { roundNumber: nextNum, roundName: `Round ${nextNum}` }]);
+                      }}
+                    >
+                      <i className="bi bi-plus-circle me-1"></i> Add New Round
+                    </button>
+                  </div>
+
+                  <div className="row g-2 mb-2">
+                    {editableRounds.map((rnd, rIdx) => (
+                      <div key={rIdx} className="col-md-4">
+                        <div className="input-group input-group-sm">
+                          <span className="input-group-text bg-white fw-bold">R{rIdx + 1}</span>
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={rnd.roundName}
+                            onChange={(e) => {
+                              const copy = [...editableRounds];
+                              copy[rIdx].roundName = e.target.value;
+                              setEditableRounds(copy);
+                            }}
+                            placeholder="Round name..."
+                          />
+                          {editableRounds.length > 1 && (
+                            <button
+                              type="button"
+                              className="btn btn-outline-danger"
+                              onClick={() => {
+                                const copy = editableRounds.filter((_, idx) => idx !== rIdx);
+                                setEditableRounds(copy);
+                              }}
+                              title="Delete Round"
+                            >
+                              <i className="bi bi-x"></i>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="text-end">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-success fw-semibold"
+                      disabled={savingRounds}
+                      onClick={handleSaveDynamicRounds}
+                    >
+                      {savingRounds ? 'Saving Changes...' : 'Save & Synchronize Rounds Across Candidates'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="modal-body p-3" style={{ overflowY: 'auto' }}>
                 {loadingEvaluations ? (
@@ -1683,8 +2000,8 @@ export default function PlacementDashboard({ user }) {
                               <td className="text-end">
                                 {ev.finalStatus !== 'Placed' ? (
                                   <button
-                                    className="btn btn-sm btn-success py-0 px-2"
-                                    onClick={() => handleUpdateStudentRound(ev.studentId, evaluationData.rounds.length, 'Placed', true)}
+                                    className="btn btn-sm btn-success py-0 px-2 fw-semibold"
+                                    onClick={() => handleUpdateStudentRound(ev.studentId, evaluationData.rounds.length, 'Placed', true, ev.placedRole, ev.placedCTC)}
                                   >
                                     <i className="bi bi-check2-circle me-1"></i> Mark Placed
                                   </button>
@@ -1706,78 +2023,6 @@ export default function PlacementDashboard({ user }) {
                   Close Evaluator
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: CREATE TICKET */}
-      {showCreateTicketModal && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content shadow border-0">
-              <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title fw-bold">Raise Ticket to Admin</h5>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setShowCreateTicketModal(false)}></button>
-              </div>
-              <form onSubmit={handleCreateTicket}>
-                <div className="modal-body p-4">
-                  <div className="mb-3">
-                    <label className="form-label small fw-semibold">Ticket Type *</label>
-                    <select
-                      className="form-select"
-                      value={ticketForm.ticketType}
-                      onChange={(e) => setTicketForm({ ...ticketForm, ticketType: e.target.value })}
-                    >
-                      <option value="feature_modification">Feature / Modification Ticket</option>
-                      <option value="problem_fix">Problem / Bug Fix Ticket</option>
-                    </select>
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small fw-semibold">Priority</label>
-                    <select
-                      className="form-select"
-                      value={ticketForm.priority}
-                      onChange={(e) => setTicketForm({ ...ticketForm, priority: e.target.value })}
-                    >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                      <option value="Critical">Critical</option>
-                    </select>
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small fw-semibold">Subject *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Brief summary of request..."
-                      value={ticketForm.subject}
-                      onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label small fw-semibold">Description *</label>
-                    <textarea
-                      className="form-control"
-                      rows="4"
-                      placeholder="Describe what needs to be added, changed, or fixed..."
-                      value={ticketForm.description}
-                      onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })}
-                      required
-                    ></textarea>
-                  </div>
-                </div>
-                <div className="modal-footer bg-light">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCreateTicketModal(false)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary btn-sm">
-                    Submit Ticket
-                  </button>
-                </div>
-              </form>
             </div>
           </div>
         </div>

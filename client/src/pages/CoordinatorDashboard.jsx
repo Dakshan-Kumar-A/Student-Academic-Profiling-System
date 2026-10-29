@@ -2551,20 +2551,36 @@ export default function CoordinatorDashboard({ user }) {
               </div>
               <div className="d-flex flex-wrap gap-2">
                 <a
-                  href={`/api/placement/export-master-tracking?department=${dept}`}
+                  href={`/api/excels/1-qs-gauge?department=${dept}`}
                   download
                   className="btn btn-outline-success btn-sm fw-semibold"
-                  title="Download Placement Tracking Matrix for your department"
+                  title="Download QS I-Gauge Excel for your department (Excel 1)"
                 >
-                  <i className="bi bi-file-earmark-excel-fill me-1"></i> Master Tracking Excel
+                  <i className="bi bi-file-earmark-check-fill me-1"></i> QS I-Gauge (Excel 1)
                 </a>
                 <a
-                  href={`/api/placement/unwillingness/export-excel?department=${dept}`}
+                  href="/api/excels/3-drives-detail"
                   download
-                  className="btn btn-outline-primary btn-sm fw-semibold"
-                  title="Download Unwillingness Records for Higher Studies & Entrepreneurship"
+                  className="btn btn-outline-info btn-sm fw-semibold"
+                  title="Download Drives Multi-Sheet Workbook (Excel 3)"
                 >
-                  <i className="bi bi-file-earmark-lock-fill me-1"></i> Unwillingness Excel
+                  <i className="bi bi-folder2-open me-1"></i> Drives Detail (Excel 3)
+                </a>
+                <a
+                  href={`/api/excels/4-master-tracking?department=${dept}`}
+                  download
+                  className="btn btn-outline-warning btn-sm fw-semibold text-dark"
+                  title="Download Master Placement Tracking Matrix for your department (Excel 4)"
+                >
+                  <i className="bi bi-grid-3x3-gap-fill me-1"></i> Master Matrix (Excel 4)
+                </a>
+                <a
+                  href={`/api/excels/5-unwillingness-and-placed?department=${dept}`}
+                  download
+                  className="btn btn-outline-danger btn-sm fw-semibold"
+                  title="Download Unwillingness & Placed Dual Workbook (Excel 5)"
+                >
+                  <i className="bi bi-layers-fill me-1"></i> Unwillingness & Placed (Excel 5)
                 </a>
                 <button
                   className="btn btn-warning text-dark btn-sm fw-semibold shadow-sm"
