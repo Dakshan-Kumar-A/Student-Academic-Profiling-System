@@ -14,6 +14,7 @@ const ticketRoutes = require('./routes/ticketRoutes');
 const placementRoutes = require('./routes/placementRoutes');
 const excelRoutes = require('./routes/excelRoutes');
 const studentRoutes = require('./routes/studentRoutes');
+const communicationRoutes = require('./routes/communicationRoutes');
 const { logSystemEvent } = require('./utils/logger');
 const { seedInitialAdmin } = require('./utils/seed');
 
@@ -46,6 +47,7 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/placement', placementRoutes);
 app.use('/api/excels', excelRoutes);
 app.use('/api/student', studentRoutes);
+app.use('/api/communication', communicationRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
