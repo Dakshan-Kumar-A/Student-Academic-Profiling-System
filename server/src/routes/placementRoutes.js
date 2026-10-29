@@ -351,6 +351,39 @@ router.get('/students/:id', async (req, res) => {
   }
 });
 
+// @route   PUT /api/placement/students/:id/remarks
+// @desc    Update placement remarks for QS I-Gauge Excel 1 & Student Profiling
+router.put('/students/:id/remarks', async (req, res) => {
+  try {
+    const { placementRemarks, entrepreneurshipRemarks, higherStudiesRemarks, generalRemarks } = req.body;
+    const profile = await StudentProfile.findOne({
+      $or: [{ _id: req.params.id }, { userId: req.params.id }],
+    });
+    if (!profile) {
+      return res.status(404).json({ success: false, message: 'Student profile not found.' });
+    }
+
+    profile.mentorRemarks = {
+      placementRemarks: placementRemarks !== undefined ? placementRemarks : (profile.mentorRemarks?.placementRemarks || ''),
+      entrepreneurshipRemarks: entrepreneurshipRemarks !== undefined ? entrepreneurshipRemarks : (profile.mentorRemarks?.entrepreneurshipRemarks || ''),
+      higherStudiesRemarks: higherStudiesRemarks !== undefined ? higherStudiesRemarks : (profile.mentorRemarks?.higherStudiesRemarks || ''),
+      generalRemarks: generalRemarks !== undefined ? generalRemarks : (profile.mentorRemarks?.generalRemarks || ''),
+      updatedByName: req.user.name,
+      updatedAt: new Date(),
+    };
+
+    await profile.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Student remarks updated successfully.',
+      mentorRemarks: profile.mentorRemarks,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ==========================================
 // 3. PLACEMENT DRIVES (CRUD + ROUNDS + EVALUATION)
 // ==========================================
@@ -755,9 +788,14 @@ router.put('/drives/:id/evaluations', authorize('placement_officer', 'admin'), a
       evaluation.placedRole = placedRole || (drive.roles && drive.roles[0] ? drive.roles[0].roleName : 'Selected Role');
       evaluation.placedCTC = placedCTC || (drive.roles && drive.roles[0] ? drive.roles[0].ctc : 'CTC As Agreed');
 
-      // Update StudentProfile placementStatus
+      // Update StudentProfile placementStatus and placementOffers for all 5 Excels
       if (studentProfile) {
-        const ctcNum = parseFloat((evaluation.placedCTC || '').match(/[0-9]+(\.[0-9]+)?/) ? RegExp.$1 : '0');
+        const ctcNum = parseFloat((evaluation.placedCTC || '').match(/[0-9]+(\.[0-9]+)?/) ? RegExp.$1 : '0') || 0;
+        studentProfile.isPlaced = 'Yes';
+        studentProfile.placedCompany = drive.companyName;
+        studentProfile.salaryPackage = ctcNum;
+        studentProfile.placementType = 'On-Campus';
+        studentProfile.jobRole = evaluation.placedRole;
         studentProfile.placementStatus = {
           isPlaced: true,
           placementType: 'On-Campus',
@@ -765,6 +803,26 @@ router.put('/drives/:id/evaluations', authorize('placement_officer', 'admin'), a
           packageCTC: ctcNum,
           jobRole: evaluation.placedRole,
         };
+
+        if (!Array.isArray(studentProfile.placementOffers)) {
+          studentProfile.placementOffers = [];
+        }
+        const existingOfferIdx = studentProfile.placementOffers.findIndex(o =>
+          (o.companyName || '').toLowerCase() === drive.companyName.toLowerCase()
+        );
+        const offerData = {
+          companyName: drive.companyName,
+          jobRole: evaluation.placedRole,
+          packageCTC: ctcNum,
+          placementType: 'On-Campus',
+          offerType: drive.offerType || 'Full Time',
+          dateOfOffer: new Date(),
+        };
+        if (existingOfferIdx > -1) {
+          studentProfile.placementOffers[existingOfferIdx] = offerData;
+        } else {
+          studentProfile.placementOffers.push(offerData);
+        }
         await studentProfile.save();
       }
 
@@ -798,6 +856,59 @@ router.put('/drives/:id/evaluations', authorize('placement_officer', 'admin'), a
       success: true,
       message: `Evaluation for ${evaluation.studentName} updated successfully.`,
       evaluation,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/placement/drives/:id/rounds
+// @desc    Add, modify, rename, or remove rounds of a drive dynamically
+router.put('/drives/:id/rounds', authorize('placement_officer', 'admin'), async (req, res) => {
+  try {
+    const { rounds } = req.body;
+    if (!Array.isArray(rounds)) {
+      return res.status(400).json({ success: false, message: 'rounds array is required.' });
+    }
+
+    const drive = await DepartmentDrive.findById(req.params.id);
+    if (!drive) {
+      return res.status(404).json({ success: false, message: 'Drive not found.' });
+    }
+
+    const formattedRounds = rounds.map((r, idx) => ({
+      roundNumber: idx + 1,
+      roundName: (r.roundName || `Round ${idx + 1}`).trim(),
+    }));
+
+    drive.rounds = formattedRounds;
+
+    // Synchronize round evaluations for all opted students
+    drive.roundEvaluations.forEach((ev) => {
+      const oldRoundsMap = new Map();
+      (ev.rounds || []).forEach(oldR => {
+        oldRoundsMap.set(oldR.roundNumber, oldR);
+      });
+
+      ev.rounds = formattedRounds.map((r) => {
+        const existing = oldRoundsMap.get(r.roundNumber);
+        return {
+          roundNumber: r.roundNumber,
+          roundName: r.roundName,
+          status: existing ? existing.status : 'Failed',
+          remarks: existing ? existing.remarks : '',
+          updatedAt: existing ? existing.updatedAt : new Date(),
+        };
+      });
+    });
+
+    await drive.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Drive rounds updated and synchronized successfully.',
+      rounds: drive.rounds,
+      evaluations: drive.roundEvaluations,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

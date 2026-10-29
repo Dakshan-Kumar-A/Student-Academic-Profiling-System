@@ -894,6 +894,37 @@ router.put('/students/:id', async (req, res) => {
   }
 });
 
+// @route   PUT /api/coordinator/students/:id/remarks
+// @desc    Update mentor & coordinator remarks for QS I-Gauge Excel 1 & Student Profiling
+router.put('/students/:id/remarks', async (req, res) => {
+  try {
+    const { placementRemarks, entrepreneurshipRemarks, higherStudiesRemarks, generalRemarks } = req.body;
+    const profile = await StudentProfile.findById(req.params.id);
+    if (!profile) {
+      return res.status(404).json({ success: false, message: 'Student profile not found.' });
+    }
+
+    profile.mentorRemarks = {
+      placementRemarks: placementRemarks !== undefined ? placementRemarks : (profile.mentorRemarks?.placementRemarks || ''),
+      entrepreneurshipRemarks: entrepreneurshipRemarks !== undefined ? entrepreneurshipRemarks : (profile.mentorRemarks?.entrepreneurshipRemarks || ''),
+      higherStudiesRemarks: higherStudiesRemarks !== undefined ? higherStudiesRemarks : (profile.mentorRemarks?.higherStudiesRemarks || ''),
+      generalRemarks: generalRemarks !== undefined ? generalRemarks : (profile.mentorRemarks?.generalRemarks || ''),
+      updatedByName: req.user.name,
+      updatedAt: new Date(),
+    };
+
+    await profile.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Student remarks updated successfully.',
+      mentorRemarks: profile.mentorRemarks,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   DELETE /api/coordinator/students/:id
 // @desc    Delete student profile and associated user
 router.delete('/students/:id', async (req, res) => {
