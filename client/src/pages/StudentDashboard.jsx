@@ -5,6 +5,13 @@ import CommunicationHub from '../components/CommunicationHub';
 import TicketSupportCenter from '../components/TicketSupportCenter';
 import { studentAPI } from '../services/api';
 
+const getCareerGoalText = (cg) => {
+  if (!cg) return 'Undecided';
+  if (typeof cg === 'string') return cg;
+  if (typeof cg === 'object') return cg.primaryGoal || 'Undecided';
+  return 'Undecided';
+};
+
 export default function StudentDashboard() {
   const [currentUser] = useState(() => {
     return JSON.parse(localStorage.getItem('user') || '{}');
@@ -28,6 +35,7 @@ export default function StudentDashboard() {
   const [unwillingnessSubmission, setUnwillingnessSubmission] = useState(null);
   const [unwillingnessReason, setUnwillingnessReason] = useState('');
   const [unwillingnessCareerChoice, setUnwillingnessCareerChoice] = useState('Higher Studies');
+  const [unwillingnessResponses, setUnwillingnessResponses] = useState({});
   const [higherStudiesDetails, setHigherStudiesDetails] = useState({
     targetDegree: '',
     specialization: '',
@@ -222,7 +230,7 @@ export default function StudentDashboard() {
   };
 
   const completeness = profile?.profileCompleteness || 0;
-  const isNonPlacement = profile?.careerGoal === 'Higher Studies' || profile?.careerGoal === 'Entrepreneurship';
+  const isNonPlacement = getCareerGoalText(profile?.careerGoal) === 'Higher Studies' || getCareerGoalText(profile?.careerGoal) === 'Entrepreneurship';
 
   return (
     <div className="min-vh-100 bg-light">
@@ -244,7 +252,7 @@ export default function StudentDashboard() {
                   <span className="fw-semibold text-dark">{profile?.department || '—'}</span> • Sec:{' '}
                   <span className="fw-semibold text-dark">{profile?.section || 'A'}</span> • CGPA:{' '}
                   <span className="badge bg-primary-subtle text-primary fw-bold">
-                    {profile?.currentCGPA ? profile.currentCGPA.toFixed(2) : '0.00'}
+                    {Number(profile?.currentCGPA || 0).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -269,7 +277,7 @@ export default function StudentDashboard() {
 
                 <div className="badge bg-light text-dark border p-2 text-start">
                   <div className="text-muted" style={{ fontSize: '0.68rem' }}>Career Track</div>
-                  <div className="fw-bold text-primary">{profile?.careerGoal || 'Undecided'}</div>
+                  <div className="fw-bold text-primary">{getCareerGoalText(profile?.careerGoal)}</div>
                 </div>
               </div>
             </div>
@@ -345,13 +353,13 @@ export default function StudentDashboard() {
                   <h5 className="fw-bold text-dark mb-1">{profile?.name}</h5>
                   <div className="text-muted small mb-2">{profile?.rollNumber} • {profile?.department} ({profile?.section || 'A'})</div>
                   <span className="badge bg-primary-subtle text-primary border border-primary-subtle py-1 px-3 rounded-pill fw-semibold mb-3">
-                    Goal: {profile?.careerGoal || 'Undecided'}
+                    Goal: {getCareerGoalText(profile?.careerGoal)}
                   </span>
 
                   <div className="row g-2 text-start pt-3 border-top small">
                     <div className="col-6">
                       <div className="text-muted">Current CGPA</div>
-                      <div className="fw-bold fs-6 text-dark">{profile?.currentCGPA ? profile.currentCGPA.toFixed(2) : '0.00'}</div>
+                      <div className="fw-bold fs-6 text-dark">{Number(profile?.currentCGPA || 0).toFixed(2)}</div>
                     </div>
                     <div className="col-6">
                       <div className="text-muted">Category</div>
@@ -936,10 +944,10 @@ export default function StudentDashboard() {
                 <div>
                   <h6 className="fw-bold mb-1 text-dark">
                     <i className="bi bi-exclamation-triangle-fill text-warning me-2"></i>
-                    Career Goal Track: {profile?.careerGoal}
+                    Career Goal Track: {getCareerGoalText(profile?.careerGoal)}
                   </h6>
                   <p className="mb-0 small text-secondary">
-                    You have opted for {profile?.careerGoal}. Campus placement participation is locked. Submit your Placement Unwillingness undertaking form to register your target path with the placement office.
+                    You have opted for {getCareerGoalText(profile?.careerGoal)}. Campus placement participation is locked. Submit your Placement Unwillingness undertaking form to register your target path with the placement office.
                   </p>
                 </div>
                 <button
@@ -1202,193 +1210,418 @@ export default function StudentDashboard() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: PLACEMENT UNWILLINGNESS UNDERTAKING FORM */}
+        {/* ========================================================================= */}
+        {/* TAB 4: PLACEMENT UNWILLINGNESS UNDERTAKING FORM (GOOGLE / MICROSOFT FORM STYLE) */}
         {/* ========================================================================= */}
         {activeTab === 'unwillingness' && (
-          <div className="card border-0 shadow-sm rounded-3">
-            <div className="card-header bg-white border-bottom p-3">
-              <h5 className="fw-bold mb-1 text-dark d-flex align-items-center gap-2">
-                <i className="bi bi-file-earmark-lock2-fill text-danger"></i>
-                Placement Unwillingness Undertaking & Documentation
-              </h5>
-              <small className="text-muted">
-                Mandatory documentation for students choosing Higher Studies or Entrepreneurship
-              </small>
-            </div>
-
-            <div className="card-body p-4">
-              {unwillingnessSubmission ? (
-                <div className="alert alert-success border-success-subtle p-4 rounded-3">
-                  <div className="d-flex align-items-center gap-3 mb-3">
-                    <i className="bi bi-check-circle-fill text-success fs-1"></i>
+          <div className="py-2" style={{ maxWidth: '780px', margin: '0 auto' }}>
+            {unwillingnessSubmission ? (
+              <div className="card shadow-sm border-0 rounded-4 overflow-hidden mb-4">
+                <div style={{ height: '10px', backgroundColor: '#673ab7' }}></div>
+                <div className="card-body p-4 p-md-5">
+                  <div className="d-flex align-items-center gap-3 mb-4">
+                    <div className="rounded-circle d-flex align-items-center justify-content-center bg-success-subtle text-success p-3">
+                      <i className="bi bi-check2-circle fs-1"></i>
+                    </div>
                     <div>
-                      <h5 className="fw-bold text-success mb-1">Undertaking Form Formally Submitted</h5>
-                      <div className="text-secondary small">
-                        Submitted on {new Date(unwillingnessSubmission.submittedAt).toLocaleDateString()} at{' '}
-                        {new Date(unwillingnessSubmission.submittedAt).toLocaleTimeString()}
-                      </div>
+                      <h4 className="fw-bold text-dark mb-1">Your response has been recorded.</h4>
+                      <p className="text-secondary small mb-0">
+                        Formal Placement Unwillingness Undertaking submitted on{' '}
+                        {new Date(unwillingnessSubmission.submittedAt).toLocaleDateString()} at{' ' }
+                        {new Date(unwillingnessSubmission.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                      </p>
                     </div>
                   </div>
 
-                  <div className="row g-3 small bg-white p-3 rounded border mb-3">
-                    <div className="col-md-4">
-                      <span className="text-muted">Chosen Track:</span>
-                      <div className="fw-bold text-dark">{unwillingnessSubmission.careerGoalChoice}</div>
-                    </div>
-                    <div className="col-md-4">
-                      <span className="text-muted">Record Lock Status:</span>
-                      <div className="fw-bold text-danger">
-                        {unwillingnessSubmission.isLocked ? 'Locked (Opt-in Bypassed)' : 'Unlocked'}
-                      </div>
-                    </div>
-                    <div className="col-md-4">
-                      <span className="text-muted">Permission to Switch:</span>
-                      <div className="fw-bold text-dark">
-                        {unwillingnessSubmission.allowPlacementSwitch ? 'Permitted' : 'Not Permitted (Placement Cell Locked)'}
-                      </div>
-                    </div>
-                    <div className="col-12">
-                      <span className="text-muted">Submitted Reason:</span>
-                      <div className="text-dark mt-1">{unwillingnessSubmission.reasonForUnwillingness}</div>
-                    </div>
-                  </div>
-
-                  <p className="small text-muted mb-0">
-                    Your institutional record has been successfully updated in QS I-Gauge and Master Placement registers. To request any modification, please submit a ticket to the Placement Support Desk.
-                  </p>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmitUnwillingness}>
                   <div className="alert alert-light border rounded-3 p-3 mb-4">
-                    <h6 className="fw-bold text-dark mb-1">
-                      {unwillingnessForm?.title || 'Placement Unwillingness Undertaking'}
-                    </h6>
-                    <p className="text-secondary small mb-2">
-                      {unwillingnessForm?.instructions || 'Students choosing Higher Studies or Entrepreneurship must submit this formal undertaking.'}
-                    </p>
-                    {unwillingnessForm?.sampleDocumentUrl && (
-                      <a href={unwillingnessForm.sampleDocumentUrl} target="_blank" rel="noreferrer" className="btn btn-outline-primary btn-sm">
-                        <i className="bi bi-download me-1"></i> Download Blank Undertaking Form Template
-                      </a>
-                    )}
+                    <div className="row g-3 small">
+                      <div className="col-sm-6">
+                        <span className="text-muted d-block">Career Track Chosen:</span>
+                        <strong className="text-primary fs-6">{unwillingnessSubmission.careerGoalChoice}</strong>
+                      </div>
+                      <div className="col-sm-6">
+                        <span className="text-muted d-block">Placement Eligibility Status:</span>
+                        <span className="badge bg-danger-subtle text-danger border border-danger-subtle">
+                          Locked (Bypassed from Campus Drives)
+                        </span>
+                      </div>
+                      <div className="col-12">
+                        <span className="text-muted d-block">Stated Reason:</span>
+                        <div className="text-dark bg-white p-2 rounded border mt-1">
+                          {unwillingnessSubmission.reasonForUnwillingness}
+                        </div>
+                      </div>
+                      {unwillingnessSubmission.customResponses && Object.keys(unwillingnessSubmission.customResponses).length > 0 && (
+                        <div className="col-12">
+                          <span className="text-muted d-block mb-1">Submitted Form Answers:</span>
+                          <div className="d-flex flex-column gap-2 bg-white p-2 rounded border">
+                            {Object.entries(unwillingnessSubmission.customResponses).map(([qKey, aVal], aIdx) => (
+                              <div key={aIdx} className="small">
+                                <span className="fw-semibold text-secondary">{qKey}:</span>{' ' }
+                                <span className="text-dark fw-bold">{Array.isArray(aVal) ? aVal.join(', ') : String(aVal)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="row g-3 mb-3">
-                    <div className="col-md-6">
-                      <label className="form-label small fw-semibold">Career Choice *</label>
-                      <select
-                        className="form-select form-select-sm fw-bold"
-                        value={unwillingnessCareerChoice}
+                  <div className="d-flex justify-content-between align-items-center pt-2">
+                    <small className="text-muted">
+                      Need to switch back to Placement? Please contact the Placement Officer or raise a ticket.
+                    </small>
+                    <button className="btn btn-outline-secondary btn-sm" onClick={() => setActiveTab('overview')}>
+                      Back to Overview
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitUnwillingness} className="d-flex flex-column gap-4">
+                {/* Form Header Card */}
+                <div className="card shadow-sm border-0 rounded-4 overflow-hidden">
+                  <div style={{ height: '10px', backgroundColor: '#673ab7' }}></div>
+                  <div className="card-body p-4 p-md-5">
+                    <h3 className="fw-bold text-dark mb-2">
+                      {unwillingnessForm?.title || 'Placement Unwillingness Undertaking & Documentation Form'}
+                    </h3>
+                    <p className="text-secondary small mb-3" style={{ whiteSpace: 'pre-line' }}>
+                      {unwillingnessForm?.instructions ||
+                        'Mandatory undertaking form for students pursuing Higher Studies or Entrepreneurship instead of campus placement drives. Completing this form locks your preference and updates institutional records.'}
+                    </p>
+                    <hr className="my-3 text-muted" />
+                    <div className="d-flex justify-content-between align-items-center text-muted small">
+                      <span>* Indicates required question</span>
+                      <span className="badge bg-light text-dark border">Official Undertaking</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Prefilled Student Identity Card */}
+                <div className="card shadow-sm border-0 rounded-4 p-4">
+                  <h6 className="fw-bold text-dark mb-3">
+                    <i className="bi bi-person-badge-fill text-primary me-2"></i> Student Identification
+                  </h6>
+                  <div className="row g-2 small text-secondary">
+                    <div className="col-sm-6">
+                      Name: <strong className="text-dark">{profile?.name || currentUser?.name}</strong>
+                    </div>
+                    <div className="col-sm-6">
+                      Roll Number: <strong className="text-dark">{profile?.rollNumber || '—'}</strong>
+                    </div>
+                    <div className="col-sm-6">
+                      Department: <strong className="text-dark">{profile?.department || '—'} ({profile?.section || 'A'})</strong>
+                    </div>
+                    <div className="col-sm-6">
+                      Current CGPA: <strong className="text-dark">{Number(profile?.currentCGPA || 0).toFixed(2)}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Question: Career Track Choice */}
+                <div className="card shadow-sm border-0 rounded-4 p-4">
+                  <label className="fw-bold text-dark mb-2">
+                    Primary Career Track Choice <span className="text-danger">*</span>
+                  </label>
+                  <div className="d-flex flex-column gap-2 mt-2">
+                    <div className="form-check">
+                      <input
+                        className="form-check-input"
+                        type="radio"
+                        name="careerTrackOption"
+                        id="trackHigher"
+                        value="Higher Studies"
+                        checked={unwillingnessCareerChoice === 'Higher Studies'}
                         onChange={(e) => setUnwillingnessCareerChoice(e.target.value)}
                         required
-                      >
-                        <option value="Higher Studies">Higher Studies</option>
-                        <option value="Entrepreneurship">Entrepreneurship / Startup</option>
-                      </select>
+                      />
+                      <label className="form-check-label fw-semibold text-dark" htmlFor="trackHigher">
+                        Higher Studies (Masters / MS / MBA / M.Tech / PhD)
+                      </label>
                     </div>
-
-                    {unwillingnessCareerChoice === 'Higher Studies' ? (
-                      <>
-                        <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Target Degree *</label>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="e.g. MS, MBA, M.Tech"
-                            value={higherStudiesDetails.targetDegree}
-                            onChange={(e) => setHigherStudiesDetails({ ...higherStudiesDetails, targetDegree: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Target Country / Region</label>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="e.g. USA, Germany, India"
-                            value={higherStudiesDetails.countryPreference}
-                            onChange={(e) => setHigherStudiesDetails({ ...higherStudiesDetails, countryPreference: e.target.value })}
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Competitive Entrance Exam</label>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="e.g. GRE, TOEFL, GATE, CAT"
-                            value={higherStudiesDetails.entranceExam}
-                            onChange={(e) => setHigherStudiesDetails({ ...higherStudiesDetails, entranceExam: e.target.value })}
-                          />
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Startup / Venture Name *</label>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="e.g. NextGen Robotics Ltd"
-                            value={entrepreneurshipDetails.startupName}
-                            onChange={(e) => setEntrepreneurshipDetails({ ...entrepreneurshipDetails, startupName: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Industry / Domain</label>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="e.g. EdTech, FinTech, AgriTech"
-                            value={entrepreneurshipDetails.industry}
-                            onChange={(e) => setEntrepreneurshipDetails({ ...entrepreneurshipDetails, industry: e.target.value })}
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label className="form-label small fw-semibold">Current Stage</label>
-                          <select
-                            className="form-select form-select-sm"
-                            value={entrepreneurshipDetails.currentStage}
-                            onChange={(e) => setEntrepreneurshipDetails({ ...entrepreneurshipDetails, currentStage: e.target.value })}
-                          >
-                            <option value="Idea">Idea Phase</option>
-                            <option value="Prototype">Prototype / MVP Ready</option>
-                            <option value="Registered">Incorporated Entity</option>
-                          </select>
-                        </div>
-                      </>
-                    )}
-
-                    <div className="col-12">
-                      <label className="form-label small fw-semibold">Reason for Placement Unwillingness *</label>
-                      <textarea
-                        className="form-control form-control-sm"
-                        rows="3"
-                        placeholder="State your clear rationale for not participating in on-campus placement drives..."
-                        value={unwillingnessReason}
-                        onChange={(e) => setUnwillingnessReason(e.target.value)}
-                        required
-                      ></textarea>
-                    </div>
-                  </div>
-
-                  <div className="alert alert-secondary small mb-3">
                     <div className="form-check">
-                      <input className="form-check-input" type="checkbox" id="parentAck" defaultChecked required />
-                      <label className="form-check-label text-dark fw-semibold" htmlFor="parentAck">
-                        I hereby declare that this decision has been taken with full acknowledgment of my parents / guardian.
+                      <input
+                        className="form-check-input"
+                        type="radio"
+                        name="careerTrackOption"
+                        id="trackStartup"
+                        value="Entrepreneurship"
+                        checked={unwillingnessCareerChoice === 'Entrepreneurship'}
+                        onChange={(e) => setUnwillingnessCareerChoice(e.target.value)}
+                        required
+                      />
+                      <label className="form-check-label fw-semibold text-dark" htmlFor="trackStartup">
+                        Entrepreneurship / Starting own Venture / Family Business
                       </label>
                     </div>
                   </div>
+                </div>
 
-                  <div className="text-end">
-                    <button type="submit" className="btn btn-danger fw-semibold" disabled={submittingUnwillingness}>
-                      {submittingUnwillingness ? 'Registering...' : 'Submit Unwillingness Undertaking'}
-                    </button>
+                {/* Track Details Card */}
+                {unwillingnessCareerChoice === 'Higher Studies' ? (
+                  <div className="card shadow-sm border-0 rounded-4 p-4">
+                    <h6 className="fw-bold text-dark mb-3">Higher Studies Target Details</h6>
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <label className="form-label small fw-semibold">Target Degree <span className="text-danger">*</span></label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="e.g. MS in Computer Science, MBA, M.Tech"
+                          value={higherStudiesDetails.targetDegree}
+                          onChange={(e) => setHigherStudiesDetails({ ...higherStudiesDetails, targetDegree: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label small fw-semibold">Country / Study Destination</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="e.g. India, USA, Germany, UK"
+                          value={higherStudiesDetails.countryPreference}
+                          onChange={(e) => setHigherStudiesDetails({ ...higherStudiesDetails, countryPreference: e.target.value })}
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label small fw-semibold">Entrance / Language Exam</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="e.g. GATE, GRE, IELTS, TOEFL, CAT"
+                          value={higherStudiesDetails.entranceExam}
+                          onChange={(e) => setHigherStudiesDetails({ ...higherStudiesDetails, entranceExam: e.target.value })}
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label small fw-semibold">Expected Year of Admission</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="e.g. 2027"
+                          value={higherStudiesDetails.expectedAdmissionYear}
+                          onChange={(e) => setHigherStudiesDetails({ ...higherStudiesDetails, expectedAdmissionYear: e.target.value })}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </form>
-              )}
-            </div>
+                ) : (
+                  <div className="card shadow-sm border-0 rounded-4 p-4">
+                    <h6 className="fw-bold text-dark mb-3">Venture & Startup Details</h6>
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <label className="form-label small fw-semibold">Venture / Startup Name <span className="text-danger">*</span></label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="e.g. Nexus AI Solutions"
+                          value={entrepreneurshipDetails.startupName}
+                          onChange={(e) => setEntrepreneurshipDetails({ ...entrepreneurshipDetails, startupName: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label small fw-semibold">Industry / Domain</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="e.g. EdTech, SaaS, CleanTech"
+                          value={entrepreneurshipDetails.industry}
+                          onChange={(e) => setEntrepreneurshipDetails({ ...entrepreneurshipDetails, industry: e.target.value })}
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label small fw-semibold">Current Stage</label>
+                        <select
+                          className="form-select"
+                          value={entrepreneurshipDetails.currentStage}
+                          onChange={(e) => setEntrepreneurshipDetails({ ...entrepreneurshipDetails, currentStage: e.target.value })}
+                        >
+                          <option value="Idea">Idea Phase</option>
+                          <option value="Prototype">Prototype / MVP Ready</option>
+                          <option value="Registered">Incorporated Entity</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reason for Opting Out */}
+                <div className="card shadow-sm border-0 rounded-4 p-4">
+                  <label className="fw-bold text-dark mb-2">
+                    Reason for Opting Out of Campus Placements <span className="text-danger">*</span>
+                  </label>
+                  <p className="text-muted small mb-2">
+                    State your specific objectives and preparation plans for your chosen track.
+                  </p>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    placeholder="Your answer"
+                    value={unwillingnessReason}
+                    onChange={(e) => setUnwillingnessReason(e.target.value)}
+                    required
+                  ></textarea>
+                </div>
+
+                {/* Dynamic Questions from Form Builder */}
+                {unwillingnessForm?.customFields && unwillingnessForm.customFields.length > 0 &&
+                  unwillingnessForm.customFields.map((q, qIdx) => (
+                    <div key={qIdx} className="card shadow-sm border-0 rounded-4 p-4">
+                      <label className="fw-bold text-dark mb-2">
+                        {q.fieldLabel} {q.isRequired && <span className="text-danger">*</span>}
+                      </label>
+
+                      {(q.fieldType === 'text' || q.fieldType === 'number' || q.fieldType === 'link') && (
+                        <input
+                          type={q.fieldType === 'number' ? 'number' : q.fieldType === 'link' ? 'url' : 'text'}
+                          className="form-control"
+                          placeholder="Your answer"
+                          required={q.isRequired}
+                          value={unwillingnessResponses[q.fieldLabel] || ''}
+                          onChange={(e) => setUnwillingnessResponses({
+                            ...unwillingnessResponses,
+                            [q.fieldLabel]: e.target.value,
+                          })}
+                        />
+                      )}
+
+                      {(q.fieldType === 'paragraph' || q.fieldType === 'textarea') && (
+                        <textarea
+                          className="form-control"
+                          rows="3"
+                          placeholder="Your answer"
+                          required={q.isRequired}
+                          value={unwillingnessResponses[q.fieldLabel] || ''}
+                          onChange={(e) => setUnwillingnessResponses({
+                            ...unwillingnessResponses,
+                            [q.fieldLabel]: e.target.value,
+                          })}
+                        ></textarea>
+                      )}
+
+                      {q.fieldType === 'multiple_choice' && (
+                        <div className="d-flex flex-column gap-2 mt-2">
+                          {(q.options || []).map((opt, optIdx) => (
+                            <div key={optIdx} className="form-check">
+                              <input
+                                className="form-check-input"
+                                type="radio"
+                                name={`mc_${qIdx}`}
+                                id={`mc_${qIdx}_${optIdx}`}
+                                value={opt}
+                                checked={unwillingnessResponses[q.fieldLabel] === opt}
+                                onChange={(e) => setUnwillingnessResponses({
+                                  ...unwillingnessResponses,
+                                  [q.fieldLabel]: e.target.value,
+                                })}
+                                required={q.isRequired}
+                              />
+                              <label className="form-check-label text-dark" htmlFor={`mc_${qIdx}_${optIdx}`}>
+                                {opt}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {q.fieldType === 'dropdown' && (
+                        <select
+                          className="form-select mt-2"
+                          value={unwillingnessResponses[q.fieldLabel] || ''}
+                          onChange={(e) => setUnwillingnessResponses({
+                            ...unwillingnessResponses,
+                            [q.fieldLabel]: e.target.value,
+                          })}
+                          required={q.isRequired}
+                        >
+                          <option value="">Choose</option>
+                          {(q.options || []).map((opt, optIdx) => (
+                            <option key={optIdx} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      {q.fieldType === 'checkboxes' && (
+                        <div className="d-flex flex-column gap-2 mt-2">
+                          {(q.options || []).map((opt, optIdx) => {
+                            const curList = Array.isArray(unwillingnessResponses[q.fieldLabel])
+                              ? unwillingnessResponses[q.fieldLabel]
+                              : [];
+                            const isChecked = curList.includes(opt);
+                            return (
+                              <div key={optIdx} className="form-check">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  id={`cb_${qIdx}_${optIdx}`}
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const nextList = e.target.checked
+                                      ? [...curList, opt]
+                                      : curList.filter(item => item !== opt);
+                                    setUnwillingnessResponses({
+                                      ...unwillingnessResponses,
+                                      [q.fieldLabel]: nextList,
+                                    });
+                                  }}
+                                />
+                                <label className="form-check-label text-dark" htmlFor={`cb_${qIdx}_${optIdx}`}>
+                                  {opt}
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                }
+
+                {/* Formal Undertaking Declaration Card */}
+                <div className="card shadow-sm border-0 rounded-4 p-4 bg-light">
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="formalDeclaration"
+                      defaultChecked
+                      required
+                    />
+                    <label className="form-check-label text-dark small fw-semibold" htmlFor="formalDeclaration">
+                      I solemnly affirm and undertake that I have voluntarily chosen not to participate in campus recruitment drives. I understand that my placement records will be locked and this decision cannot be revoked without explicit permission from the Placement Officer.
+                    </label>
+                  </div>
+                </div>
+
+                {/* Submit Action */}
+                <div className="d-flex justify-content-between align-items-center mb-5">
+                  <button
+                    type="submit"
+                    className="btn fw-semibold px-4 py-2 text-white shadow-sm"
+                    style={{ backgroundColor: '#673ab7' }}
+                    disabled={submittingUnwillingness}
+                  >
+                    {submittingUnwillingness ? (
+                      <span><span className="spinner-border spinner-border-sm me-2" role="status"></span>Submitting...</span>
+                    ) : (
+                      'Submit Form'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-link text-muted btn-sm text-decoration-none"
+                    onClick={() => {
+                      setUnwillingnessResponses({});
+                      setUnwillingnessReason('');
+                    }}
+                  >
+                    Clear form
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         )}
 
