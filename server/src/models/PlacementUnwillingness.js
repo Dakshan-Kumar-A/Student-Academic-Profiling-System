@@ -42,6 +42,11 @@ const unwillingnessSubmissionSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  customResponses: {
+    type: Map,
+    of: String,
+    default: {},
+  },
   isLocked: {
     type: Boolean,
     default: true, // Cannot opt back into placement once submitted
@@ -88,6 +93,14 @@ const placementUnwillingnessFormSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    customFields: [
+      {
+        fieldLabel: { type: String, required: true },
+        fieldType: { type: String, enum: ['text', 'number', 'link', 'textarea', 'dropdown'], default: 'text' },
+        isRequired: { type: Boolean, default: false },
+        options: { type: [String], default: [] },
+      },
+    ],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

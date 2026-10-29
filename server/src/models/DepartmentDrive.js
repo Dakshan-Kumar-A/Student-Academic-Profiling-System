@@ -38,7 +38,7 @@ const optInRecordSchema = new mongoose.Schema({
   clearedArrearsCount: { type: Number, default: 0 },
   selectedRoles: { type: [String], default: [] },
   customFormResponses: { type: Map, of: String, default: {} },
-  status: { type: String, enum: ['Opted-In', 'Opted-Out'], default: 'Opted-In' },
+  status: { type: String, enum: ['Opted-In', 'Opted-Out', 'Removed', 'Blocked'], default: 'Opted-In' },
   optedAt: { type: Date, default: Date.now },
 });
 
@@ -101,6 +101,13 @@ const departmentDriveSchema = new mongoose.Schema(
       type: String,
       enum: ['department', 'college_wide'],
       default: 'department',
+      index: true,
+    },
+    // Drive Type: Coordinator drives default to 'Off-Campus', Placement Officer drives to 'On-Campus'
+    driveType: {
+      type: String,
+      enum: ['On-Campus', 'Off-Campus'],
+      default: 'Off-Campus',
       index: true,
     },
     // Offer Type configuration

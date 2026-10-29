@@ -36,6 +36,11 @@ const studentProfileSchema = new mongoose.Schema({
     trim: true,
     index: true,
   },
+  registerNumber: {
+    type: String,
+    trim: true,
+    default: '',
+  },
   name: {
     type: String,
     required: true,
@@ -186,7 +191,7 @@ const studentProfileSchema = new mongoose.Schema({
     },
   },
 
-  // Placement Status
+  // Placement Status & Multiple Offers
   placementStatus: {
     isPlaced: { type: Boolean, default: false, index: true },
     placementType: { type: String, enum: ['On-Campus', 'Off-Campus', 'None'], default: 'None', index: true },
@@ -195,12 +200,49 @@ const studentProfileSchema = new mongoose.Schema({
     jobRole: { type: String, default: '' },
     offerLetterUrl: { type: String, default: '' },
   },
+  placementOffers: [
+    {
+      companyName: { type: String, required: true },
+      jobRole: { type: String, default: '' },
+      packageCTC: { type: Number, default: 0 },
+      placementType: { type: String, enum: ['On-Campus', 'Off-Campus'], default: 'On-Campus' },
+      offerType: {
+        type: String,
+        enum: ['Full Time', 'Intern', 'Intern + Full Time', 'Intern + Conversion Based on Performance'],
+        default: 'Full Time',
+      },
+      offerLetterUrl: { type: String, default: '' },
+      dateOfOffer: { type: Date, default: Date.now },
+    },
+  ],
+
+  // Mentor & Coordinator Remarks (for QS I-Gauge Excel 1 & Student Mentoring)
+  mentorRemarks: {
+    placementRemarks: { type: String, default: '' },
+    entrepreneurshipRemarks: { type: String, default: '' },
+    higherStudiesRemarks: { type: String, default: '' },
+    generalRemarks: { type: String, default: '' },
+    updatedByName: { type: String, default: '' },
+    updatedAt: { type: Date, default: null },
+  },
+
+  // Profile Completeness Meter (0-100%)
+  profileCompleteness: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100,
+  },
 }, {
   timestamps: true,
 });
 
-// Update standingArrearsCount, historyArrearsCount, clearedArrearsCount and currentCGPA whenever updated
+// Update standingArrearsCount, historyArrearsCount, clearedArrearsCount, currentCGPA, and profileCompleteness
 studentProfileSchema.pre('save', function (next) {
+  if (!this.registerNumber && this.rollNumber) {
+    this.registerNumber = this.rollNumber;
+  }
+
   if (this.arrears && this.arrears.length > 0) {
     this.standingArrearsCount = this.arrears.filter(a => a.currentStatus === 'Pending').length;
     this.clearedArrearsCount = this.arrears.filter(a => a.currentStatus === 'Cleared').length;
@@ -215,6 +257,27 @@ studentProfileSchema.pre('save', function (next) {
     const latestSem = [...this.semesters].sort((a, b) => b.semesterNumber - a.semesterNumber)[0];
     this.currentCGPA = latestSem.cgpa || 0;
   }
+
+  // Profile Completeness Calculation (0-100%)
+  let score = 0;
+  // Personal Info (20)
+  if (this.name && this.rollNumber && this.department && this.section) score += 10;
+  if (this.personalEmail || this.contactNumber || this.residentialAddress) score += 10;
+  // Parent Info (15)
+  if (this.fatherDetails?.name || this.motherDetails?.name || this.guardianDetails?.name) score += 10;
+  if (this.fatherDetails?.contactNumber || this.motherDetails?.contactNumber || this.emergencyContactNumber) score += 5;
+  // Semester records (20)
+  if (this.semesters && this.semesters.length > 0) score += 20;
+  // Technical / skills (20)
+  if (this.technicalSkills && this.technicalSkills.length > 0) score += 10;
+  if ((this.projects && this.projects.length > 0) || (this.certifications && this.certifications.length > 0) || this.githubProfile || this.linkedinProfile) score += 10;
+  // Strengths / Goals (10)
+  if (this.selfEvaluation?.strengths || this.selfEvaluation?.shortTermGoals || this.selfEvaluation?.areasForImprovement) score += 10;
+  // Career Goal (5)
+  if (this.careerGoal) score += 5;
+
+  this.profileCompleteness = Math.min(100, Math.max(0, score));
+
   next();
 });
 

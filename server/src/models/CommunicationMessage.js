@@ -17,11 +17,20 @@ const communicationMessageSchema = new mongoose.Schema({
     enum: ['circular', 'message', 'enquiry', 'announcement', 'deletion_request'],
     default: 'message',
   },
-  // 3 Dedicated Channels
+  // Communication Channels
   channel: {
     type: String,
-    enum: ['general', 'drive_announcements', 'drive_queries'],
-    default: 'general',
+    enum: [
+      'placement_announcements',
+      'placement_queries',
+      'department_channel',
+      'mentorship_channel',
+      'general_channel',
+      'general',
+      'drive_announcements',
+      'drive_queries',
+    ],
+    default: 'general_channel',
     index: true,
   },
   driveId: {
