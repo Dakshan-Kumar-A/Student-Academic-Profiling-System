@@ -72,21 +72,9 @@ export default function CommunicationHub({ user }) {
   const fetchMessages = async () => {
     try {
       setLoading(true);
-      let res;
-      if (userRole === 'student') {
-        res = await api.get('/student/communication/messages', {
-          params: { channel: activeChannelId, search: searchQuery },
-        });
-      } else if (userRole === 'placement_officer' || userRole === 'admin') {
-        res = await api.get('/placement/communication/messages', {
-          params: { channel: activeChannelId, search: searchQuery },
-        });
-      } else {
-        // Coordinator / Mentor endpoint
-        res = await api.get('/coordinator/messages', {
-          params: { channel: activeChannelId, search: searchQuery },
-        });
-      }
+      const res = await api.get('/communication/messages', {
+        params: { channel: activeChannelId, search: searchQuery },
+      });
 
       if (res.data.success) {
         setMessages(res.data.messages || []);
@@ -120,14 +108,7 @@ export default function CommunicationHub({ user }) {
         priority,
       };
 
-      let res;
-      if (userRole === 'student') {
-        res = await api.post('/student/communication/messages', payload);
-      } else if (userRole === 'placement_officer' || userRole === 'admin') {
-        res = await api.post('/placement/communication/messages', payload);
-      } else {
-        res = await api.post('/coordinator/messages', payload);
-      }
+      const res = await api.post('/communication/messages', payload);
 
       if (res.data.success) {
         Swal.fire({
@@ -154,20 +135,9 @@ export default function CommunicationHub({ user }) {
 
     setReplying(true);
     try {
-      let res;
-      if (userRole === 'student') {
-        res = await api.post(`/student/communication/messages/${messageId}/reply`, {
-          content: replyText.trim(),
-        });
-      } else if (userRole === 'placement_officer' || userRole === 'admin') {
-        res = await api.post(`/placement/communication/messages/${messageId}/reply`, {
-          content: replyText.trim(),
-        });
-      } else {
-        res = await api.post(`/coordinator/messages/${messageId}/reply`, {
-          content: replyText.trim(),
-        });
-      }
+      const res = await api.post(`/communication/messages/${messageId}/reply`, {
+        content: replyText.trim(),
+      });
 
       if (res.data.success) {
         setReplyText('');
@@ -423,13 +393,13 @@ export default function CommunicationHub({ user }) {
                             <div key={rIdx} className="bg-white p-2 rounded border small">
                               <div className="d-flex justify-content-between align-items-center mb-1">
                                 <span className="fw-bold text-dark" style={{ fontSize: '0.8rem' }}>
-                                  {rep.sender?.name || 'Participant'}
+                                  {rep.sender?.name || rep.senderName || 'Participant'}
                                   <span className="badge bg-light text-secondary border ms-1" style={{ fontSize: '0.65rem' }}>
-                                    {rep.sender?.role?.replace('_', ' ')}
+                                    {(rep.sender?.role || rep.senderRole || 'user').replace('_', ' ')}
                                   </span>
                                 </span>
                                 <small className="text-muted" style={{ fontSize: '0.7rem' }}>
-                                  {new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  {new Date(rep.sentAt || rep.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </small>
                               </div>
                               <div className="text-secondary" style={{ fontSize: '0.82rem' }}>{rep.content}</div>

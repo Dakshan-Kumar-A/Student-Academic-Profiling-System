@@ -21,6 +21,7 @@ import CustomExcelExportModal from '../components/CustomExcelExportModal';
 import FloatingCohortWindow from '../components/FloatingCohortWindow';
 import DriveManagementModal from '../components/DriveManagementModal';
 import TicketSupportCenter from '../components/TicketSupportCenter';
+import CommunicationHub from '../components/CommunicationHub';
 
 ChartJS.register(
   CategoryScale,
@@ -35,6 +36,7 @@ ChartJS.register(
 );
 
 export default function CoordinatorDashboard({ user }) {
+  const currentUser = user || JSON.parse(localStorage.getItem('user') || '{}');
   const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'management' | 'communication' | 'drives'
   const [managementSubTab, setManagementSubTab] = useState('students'); // 'students' | 'mentors' | 'allocation'
 
@@ -2302,237 +2304,10 @@ export default function CoordinatorDashboard({ user }) {
         )}
 
         {/* ======================================================== */}
-        {/* PAGE C: COMMUNICATION HUB (DIRECT RECIPIENT SELECTION) */}
+        {/* PAGE C: CENTRALIZED COMMUNICATION HUB */}
         {/* ======================================================== */}
         {activeTab === 'communication' && (
-          <div className="row g-4">
-            {/* Compose Card */}
-            <div className="col-12 col-lg-6">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-header bg-primary text-white py-3 fw-bold">
-                  <i className="bi bi-pencil-square me-2"></i> Compose Circular / Message / Enquiry
-                </div>
-                <form onSubmit={handleSendMessage} className="card-body p-4">
-                  <div className="mb-3">
-                    <label className="form-label small fw-semibold">Subject / Title *</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      placeholder="e.g. Core Placement Drive Schedule"
-                      value={messageForm.subject}
-                      onChange={(e) => setMessageForm({ ...messageForm, subject: e.target.value })}
-                      required
-                    />
-                  </div>
-
-                  <div className="row g-2 mb-3">
-                    <div className="col-6">
-                      <label className="form-label small fw-semibold">Type</label>
-                      <select
-                        className="form-select form-select-sm"
-                        value={messageForm.messageType}
-                        onChange={(e) => setMessageForm({ ...messageForm, messageType: e.target.value })}
-                      >
-                        <option value="circular">Circular</option>
-                        <option value="message">General Message</option>
-                        <option value="enquiry">Enquiry / Survey</option>
-                        <option value="announcement">Announcement</option>
-                      </select>
-                    </div>
-                    <div className="col-6">
-                      <label className="form-label small fw-semibold">Priority</label>
-                      <select
-                        className="form-select form-select-sm"
-                        value={messageForm.priority}
-                        onChange={(e) => setMessageForm({ ...messageForm, priority: e.target.value })}
-                      >
-                        <option value="Normal">Normal</option>
-                        <option value="Important">Important</option>
-                        <option value="Urgent">Urgent</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Target Audience selection */}
-                  <div className="mb-3">
-                    <label className="form-label small fw-semibold">Target Audience</label>
-                    <div className="d-flex flex-column gap-1 small mb-2">
-                      <div className="form-check">
-                        <input
-                          className="form-check-input"
-                          type="radio"
-                          name="targetGroup"
-                          id="tg1"
-                          value="all_students"
-                          checked={messageForm.targetGroup === 'all_students'}
-                          onChange={(e) => setMessageForm({ ...messageForm, targetGroup: e.target.value })}
-                        />
-                        <label className="form-check-label" htmlFor="tg1">
-                          All Students in {dept} ({students.length} students)
-                        </label>
-                      </div>
-                      <div className="form-check">
-                        <input
-                          className="form-check-input"
-                          type="radio"
-                          name="targetGroup"
-                          id="tg2"
-                          value="all_mentors"
-                          checked={messageForm.targetGroup === 'all_mentors'}
-                          onChange={(e) => setMessageForm({ ...messageForm, targetGroup: e.target.value })}
-                        />
-                        <label className="form-check-label" htmlFor="tg2">
-                          All Mentors in {dept} ({mentors.length} mentors)
-                        </label>
-                      </div>
-                      <div className="form-check">
-                        <input
-                          className="form-check-input"
-                          type="radio"
-                          name="targetGroup"
-                          id="tg3"
-                          value="custom_selection"
-                          checked={messageForm.targetGroup === 'custom_selection'}
-                          onChange={(e) => setMessageForm({ ...messageForm, targetGroup: e.target.value })}
-                        />
-                        <label className="form-check-label fw-bold text-primary" htmlFor="tg3">
-                          Select Specific Students Directly Below ({selectedStudentIds.length} currently selected)
-                        </label>
-                      </div>
-                    </div>
-
-                    {/* Requirement 4: DIRECT STUDENT SELECTION IN COMMUNICATION HUB */}
-                    {messageForm.targetGroup === 'custom_selection' && (
-                      <div className="border rounded p-3 bg-light mt-2">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <span className="small fw-bold text-dark">
-                            Select Recipients Directly ({selectedStudentIds.length} chosen):
-                          </span>
-                          <div className="btn-group btn-group-sm">
-                            <button
-                              type="button"
-                              className="btn btn-outline-primary py-0 px-2"
-                              onClick={() => setSelectedStudentIds(students.map((s) => s._id))}
-                            >
-                              Check All
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-outline-secondary py-0 px-2"
-                              onClick={() => setSelectedStudentIds([])}
-                            >
-                              Clear
-                            </button>
-                          </div>
-                        </div>
-
-                        <input
-                          type="text"
-                          className="form-control form-control-sm mb-2"
-                          placeholder="Quick search student by name or roll number..."
-                          value={commRecipientSearch}
-                          onChange={(e) => setCommRecipientSearch(e.target.value)}
-                        />
-
-                        <div className="bg-white border rounded p-2" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                          {commFilteredStudents.length === 0 ? (
-                            <span className="text-muted small">No students found matching search.</span>
-                          ) : (
-                            commFilteredStudents.map((s) => (
-                              <div key={s._id} className="form-check small py-1 border-bottom border-light">
-                                <input
-                                  className="form-check-input"
-                                  type="checkbox"
-                                  id={`comm_s_${s._id}`}
-                                  checked={selectedStudentIds.includes(s._id)}
-                                  onChange={() => toggleStudentSelection(s._id)}
-                                />
-                                <label className="form-check-label text-dark" htmlFor={`comm_s_${s._id}`}>
-                                  <strong>{s.rollNumber}</strong> - {s.name} ({s.email})
-                                </label>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label small fw-semibold">Message Body *</label>
-                    <textarea
-                      rows="4"
-                      className="form-control form-control-sm"
-                      placeholder="Type circular details or message content..."
-                      value={messageForm.content}
-                      onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
-                      required
-                    ></textarea>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-sm w-100 py-2 fw-semibold"
-                    disabled={sendingMessage}
-                  >
-                    {sendingMessage ? 'Dispatching...' : 'Dispatch Message / Circular'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            {/* Broadcasts History */}
-            <div className="col-12 col-lg-6">
-              <div className="card shadow-sm border-0 rounded-3">
-                <div className="card-header bg-white py-3 fw-bold text-dark border-bottom d-flex justify-content-between align-items-center">
-                  <span><i className="bi bi-inbox-fill text-primary me-2"></i> Broadcasts & Enquiry Threads</span>
-                  <button className="btn btn-sm btn-outline-secondary" onClick={loadMessages}>
-                    <i className="bi bi-arrow-clockwise"></i>
-                  </button>
-                </div>
-                <div className="card-body p-3" style={{ maxHeight: '680px', overflowY: 'auto' }}>
-                  {messages.length === 0 ? (
-                    <div className="text-center py-5 text-muted">No communication circulars or messages found.</div>
-                  ) : (
-                    messages.map((m) => (
-                      <div key={m._id} className="card mb-3 border shadow-none rounded-3">
-                        <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-center mb-1">
-                            <h6 className="fw-bold mb-0 text-dark">{m.subject}</h6>
-                            <span className="badge bg-secondary text-uppercase">{m.messageType}</span>
-                          </div>
-                          <div className="text-muted small mb-2">
-                            From: <strong>{m.sender?.name}</strong> • {new Date(m.createdAt).toLocaleString()} • {m.recipients?.length || 0} recipient(s)
-                          </div>
-                          <p className="mb-2 text-dark small" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</p>
-
-                          {m.replies?.map((r, rIdx) => (
-                            <div key={rIdx} className="small mb-1 p-2 bg-light rounded">
-                              <strong>{r.senderName}</strong>: {r.content}
-                            </div>
-                          ))}
-
-                          <div className="input-group input-group-sm mt-2">
-                            <input
-                              type="text"
-                              className="form-control"
-                              placeholder="Write a follow-up reply..."
-                              value={replyText[m._id] || ''}
-                              onChange={(e) => setReplyText({ ...replyText, [m._id]: e.target.value })}
-                              onKeyDown={(e) => e.key === 'Enter' && handleSendReply(m._id)}
-                            />
-                            <button className="btn btn-outline-primary" onClick={() => handleSendReply(m._id)}>
-                              Reply
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <CommunicationHub user={currentUser} />
         )}
 
         {/* ======================================================== */}
@@ -2554,33 +2329,33 @@ export default function CoordinatorDashboard({ user }) {
                   href={`/api/excels/1-qs-gauge?department=${dept}`}
                   download
                   className="btn btn-outline-success btn-sm fw-semibold"
-                  title="Download QS I-Gauge Excel for your department (Excel 1)"
+                  title="Download QS I-Gauge Data (2025-26) for your department"
                 >
-                  <i className="bi bi-file-earmark-check-fill me-1"></i> QS I-Gauge (Excel 1)
+                  <i className="bi bi-file-earmark-check-fill me-1"></i> QS I-Gauge Data (2025–26)
                 </a>
                 <a
                   href="/api/excels/3-drives-detail"
                   download
                   className="btn btn-outline-info btn-sm fw-semibold"
-                  title="Download Drives Multi-Sheet Workbook (Excel 3)"
+                  title="Download Drive-Specific Details & Round Analysis Workbook"
                 >
-                  <i className="bi bi-folder2-open me-1"></i> Drives Detail (Excel 3)
+                  <i className="bi bi-folder2-open me-1"></i> Drive Details & Analysis
                 </a>
                 <a
                   href={`/api/excels/4-master-tracking?department=${dept}`}
                   download
                   className="btn btn-outline-warning btn-sm fw-semibold text-dark"
-                  title="Download Master Placement Tracking Matrix for your department (Excel 4)"
+                  title="Download Master Placement Tracking Matrix for your department"
                 >
-                  <i className="bi bi-grid-3x3-gap-fill me-1"></i> Master Matrix (Excel 4)
+                  <i className="bi bi-grid-3x3-gap-fill me-1"></i> Master Placement Matrix
                 </a>
                 <a
                   href={`/api/excels/5-unwillingness-and-placed?department=${dept}`}
                   download
                   className="btn btn-outline-danger btn-sm fw-semibold"
-                  title="Download Unwillingness & Placed Dual Workbook (Excel 5)"
+                  title="Download Placement Unwillingness & Placed Students Register"
                 >
-                  <i className="bi bi-layers-fill me-1"></i> Unwillingness & Placed (Excel 5)
+                  <i className="bi bi-layers-fill me-1"></i> Unwillingness & Placed Register
                 </a>
                 <button
                   className="btn btn-warning text-dark btn-sm fw-semibold shadow-sm"

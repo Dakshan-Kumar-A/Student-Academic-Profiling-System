@@ -451,7 +451,7 @@ export default function StudentProfileModal({ student: initialStudent, studentId
                 )}
               </div>
             </div>
-            {/* Section 7: Mentor & Coordinator Remarks (for QS I-Gauge Excel 1 & Mentoring) */}
+            {/* Section 7: Mentor & Coordinator Remarks (for QS I-Gauge Report & Mentoring) */}
             <div className="card border-0 shadow-sm rounded-3">
               <div className="card-header bg-white py-2 px-3 fw-bold text-dark border-bottom d-flex justify-content-between align-items-center">
                 <span>
