@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { authAPI, notificationAPI } from '../services/api';
-import TicketSupportCenter from './TicketSupportCenter';
 
 export default function Navbar({ user, activeTab, setActiveTab }) {
   const navigate = useNavigate();
@@ -12,7 +11,6 @@ export default function Navbar({ user, activeTab, setActiveTab }) {
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showTicketModal, setShowTicketModal] = useState(false);
 
   // Notification Service State
   const [notifications, setNotifications] = useState([]);
@@ -163,23 +161,6 @@ export default function Navbar({ user, activeTab, setActiveTab }) {
 
           {/* Top Right Notification Center & Profile Avatar */}
           <div className="d-flex align-items-center ms-auto position-relative">
-            {/* Quick Ticket / Help Desk Trigger for all users */}
-            <button
-              type="button"
-              className="btn btn-outline-light btn-sm d-flex align-items-center me-3 py-1 px-2"
-              onClick={() => {
-                if (typeof setActiveTab === 'function') {
-                  setActiveTab('tickets');
-                } else {
-                  setShowTicketModal(true);
-                }
-              }}
-              title="Support & Issue Tickets"
-            >
-              <i className="bi bi-ticket-perforated-fill text-warning me-1"></i>
-              <span className="d-none d-sm-inline">Tickets</span>
-            </button>
-
             {/* Notification Bell */}
             <div className="position-relative me-3">
               <button
@@ -343,21 +324,6 @@ export default function Navbar({ user, activeTab, setActiveTab }) {
                   <span>My Profile & Edit</span>
                 </button>
 
-                <button
-                  className="dropdown-item py-2 rounded d-flex align-items-center small"
-                  onClick={() => {
-                    setShowDropdown(false);
-                    if (typeof setActiveTab === 'function') {
-                      setActiveTab('tickets');
-                    } else {
-                      setShowTicketModal(true);
-                    }
-                  }}
-                >
-                  <i className="bi bi-ticket-perforated text-warning me-2 fs-6"></i>
-                  <span>Support & Tickets Desk</span>
-                </button>
-
                 <div className="dropdown-divider my-1"></div>
 
                 <button
@@ -487,25 +453,6 @@ export default function Navbar({ user, activeTab, setActiveTab }) {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Universal Ticket Support Modal */}
-      {showTicketModal && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1060 }}>
-          <div className="modal-dialog modal-dialog-centered modal-xl" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content shadow border-0" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-              <div className="modal-header bg-dark text-white flex-shrink-0">
-                <h5 className="modal-title fw-bold">
-                  <i className="bi bi-ticket-detailed-fill text-warning me-2"></i> Support & Feature Tickets
-                </h5>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setShowTicketModal(false)}></button>
-              </div>
-              <div className="modal-body p-3" style={{ overflowY: 'auto' }}>
-                <TicketSupportCenter user={currentUser} />
-              </div>
             </div>
           </div>
         </div>
