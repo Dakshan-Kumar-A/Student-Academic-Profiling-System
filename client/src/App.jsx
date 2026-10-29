@@ -7,6 +7,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import CoordinatorDashboard from './pages/CoordinatorDashboard';
 import MentorDashboard from './pages/MentorDashboard';
 import PlacementDashboard from './pages/PlacementDashboard';
+import StudentDashboard from './pages/StudentDashboard';
 import RoleDashboardPlaceholder from './pages/RoleDashboardPlaceholder';
 
 // Protected Route Wrapper
@@ -81,8 +82,8 @@ export default function App() {
         <Route
           path="/student"
           element={
-            <ProtectedRoute allowedRoles={['student']}>
-              <RoleDashboardPlaceholder roleTitle="Student Academic & Career Profile" roleName="student" />
+            <ProtectedRoute allowedRoles={['student', 'admin']}>
+              <StudentDashboard />
             </ProtectedRoute>
           }
         />

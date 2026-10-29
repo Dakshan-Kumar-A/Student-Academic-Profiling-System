@@ -88,6 +88,7 @@ export const coordinatorAPI = {
   optOutDrive: (driveId, data) => api.post(`/coordinator/drives/${driveId}/opt-out`, data),
   getDriveExportExcelUrl: (driveId) => `/api/coordinator/drives/${driveId}/export-excel`,
   downloadDriveExcel: (driveId) => api.get(`/coordinator/drives/${driveId}/export-excel`, { responseType: 'blob' }),
+  updateRemarks: (studentId, data) => api.put(`/coordinator/students/${studentId}/remarks`, data),
   getMessages: () => api.get('/coordinator/messages'),
   sendMessage: (data) => api.post('/coordinator/messages', data),
   replyMessage: (id, data) => api.post(`/coordinator/messages/${id}/reply`, data),
@@ -102,6 +103,7 @@ export const mentorAPI = {
     api.post('/mentor/export-excel', data, {
       responseType: 'blob',
     }),
+  updateRemarks: (studentId, data) => api.put(`/mentor/students/${studentId}/remarks`, data),
   getCommunicationRecipients: () => api.get('/mentor/communication/recipients'),
   getMessages: () => api.get('/mentor/messages'),
   sendMessage: (data) => api.post('/mentor/messages', data),
@@ -130,17 +132,42 @@ export const placementAPI = {
   deleteDrive: (id) => api.delete(`/placement/drives/${id}`),
   getEvaluations: (driveId) => api.get(`/placement/drives/${driveId}/evaluations`),
   updateEvaluation: (driveId, data) => api.put(`/placement/drives/${driveId}/evaluations`, data),
+  updateDriveRounds: (driveId, data) => api.put(`/placement/drives/${driveId}/rounds`, data),
   getUnwillingnessForm: () => api.get('/placement/unwillingness/form'),
   saveUnwillingnessForm: (data) => api.post('/placement/unwillingness/form', data),
   submitUnwillingness: (data) => api.post('/placement/unwillingness/submit', data),
   getUnwillingnessSubmissions: (params) => api.get('/placement/unwillingness/submissions', { params }),
   permitPlacementSwitch: (submissionId) => api.put(`/placement/unwillingness/${submissionId}/permit-placement`),
+  updateRemarks: (studentId, data) => api.put(`/placement/students/${studentId}/remarks`, data),
   downloadDriveExcel: (driveId) => api.get(`/placement/drives/${driveId}/export-excel`, { responseType: 'blob' }),
   downloadMasterTrackingExcel: (params) => api.get('/placement/export-master-tracking', { params, responseType: 'blob' }),
   downloadUnwillingnessExcel: (params) => api.get('/placement/unwillingness/export-excel', { params, responseType: 'blob' }),
   getChannelMessages: (params) => api.get('/placement/communication/messages', { params }),
   postChannelMessage: (data) => api.post('/placement/communication/messages', data),
   replyChannelMessage: (id, data) => api.post(`/placement/communication/messages/${id}/reply`, data),
+};
+
+// 5 System Excels Engine endpoints
+export const excelAPI = {
+  downloadExcel1_QSGauge: (params) => api.get('/excels/1-qs-gauge', { params, responseType: 'blob' }),
+  downloadExcel2_Custom: (data) => api.post('/excels/2-custom-export', data, { responseType: 'blob' }),
+  downloadExcel3_Drives: (params) => api.get('/excels/3-drives-detail', { params, responseType: 'blob' }),
+  downloadExcel4_Master: (params) => api.get('/excels/4-master-tracking', { params, responseType: 'blob' }),
+  downloadExcel5_UnwillingnessPlaced: (params) => api.get('/excels/5-unwillingness-and-placed', { params, responseType: 'blob' }),
+};
+
+// Student Portal endpoints
+export const studentAPI = {
+  getProfile: () => api.get('/student/profile'),
+  updateProfile: (data) => api.put('/student/profile', data),
+  getDrives: () => api.get('/student/drives'),
+  optInDrive: (id, data) => api.post(`/student/drives/${id}/opt-in`, data),
+  optOutDrive: (id) => api.post(`/student/drives/${id}/opt-out`),
+  getUnwillingnessForm: () => api.get('/student/unwillingness'),
+  submitUnwillingnessForm: (data) => api.post('/student/unwillingness', data),
+  getMessages: (params) => api.get('/student/communication/messages', { params }),
+  postMessage: (data) => api.post('/student/communication/messages', data),
+  replyMessage: (id, data) => api.post(`/student/communication/messages/${id}/reply`, data),
 };
 
 // Notification endpoints
