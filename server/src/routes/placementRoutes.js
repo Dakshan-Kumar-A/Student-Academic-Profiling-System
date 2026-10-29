@@ -489,7 +489,7 @@ router.post('/drives', authorize('placement_officer', 'admin'), async (req, res)
 
     await drive.save();
 
-    // AUTO-CREATE Channel 2 Thread: Drive Announcements & Follow-ups (Read-only for students)
+    // AUTO-CREATE Placement Announcements Thread: Further drive details continued on this thread
     const announcementThread = new CommunicationMessage({
       sender: {
         userId: req.user._id,
@@ -498,18 +498,18 @@ router.post('/drives', authorize('placement_officer', 'admin'), async (req, res)
         role: req.user.role,
       },
       department: 'Placement Cell',
-      channel: 'drive_announcements',
+      channel: 'placement_announcements',
       driveId: drive._id,
-      isReadOnly: true, // Read-only for students
+      isReadOnly: true, // Read-only for students; placement officers can post and reply updates
       messageType: 'announcement',
       subject: `[Drive Announcement] ${drive.companyName} - Campus Recruitment Details & Schedules`,
-      content: `Official announcement thread for ${drive.companyName}.\nOffer Type: ${drive.offerType}\nLocation: ${drive.jobLocation}\nEligible Departments: ${departmentsList.join(', ')}\nOpt-in Deadline: ${new Date(drive.optInDeadline).toLocaleString()}.\nOnly placement team can post updates here.`,
+      content: `Official announcement thread for ${drive.companyName}.\nOffer Type: ${drive.offerType} (${drive.offerType === 'Internship' ? drive.internshipDurationMonths + ' Months' : ''})\nLocation: ${drive.jobLocation}\nEligible Departments: ${departmentsList.join(', ')}\nOpt-in Deadline: ${new Date(drive.optInDeadline).toLocaleString()}.\nFurther updates, round dates, and shortlisted student lists will be published on this thread.`,
       priority: 'Important',
-      targetGroup: 'all_students',
+      targetGroup: 'all',
     });
     await announcementThread.save();
 
-    // AUTO-CREATE Channel 3 Thread: Drive Queries (Open for student inquiries)
+    // AUTO-CREATE Placement Queries Thread: Students ask doubts, placement officers reply
     const queryThread = new CommunicationMessage({
       sender: {
         userId: req.user._id,
@@ -518,14 +518,14 @@ router.post('/drives', authorize('placement_officer', 'admin'), async (req, res)
         role: req.user.role,
       },
       department: 'Placement Cell',
-      channel: 'drive_queries',
+      channel: 'placement_queries',
       driveId: drive._id,
-      isReadOnly: false, // Students can ask questions
+      isReadOnly: false, // Open for student doubts & placement officer answers
       messageType: 'enquiry',
-      subject: `[Drive Q&A] ${drive.companyName} - Inquiries & Clarifications`,
-      content: `Welcome to the Q&A thread for ${drive.companyName}. Students opting in or considering this drive can post questions here. The placement team and department coordinators will reply.`,
+      subject: `[Queries] ${drive.companyName} - Student Doubts & Clarifications`,
+      content: `Official doubt resolution thread for ${drive.companyName}. Students can ask any questions regarding eligibility, role, CTC, test timings, or interview process here. Placement officers will answer.`,
       priority: 'Normal',
-      targetGroup: 'all_students',
+      targetGroup: 'all',
     });
     await queryThread.save();
 
