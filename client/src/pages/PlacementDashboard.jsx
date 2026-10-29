@@ -18,6 +18,7 @@ import FloatingCohortWindow from '../components/FloatingCohortWindow';
 import StudentProfileModal from '../components/StudentProfileModal';
 import CommunicationHub from '../components/CommunicationHub';
 import TicketSupportCenter from '../components/TicketSupportCenter';
+import CustomExcelExportModal from '../components/CustomExcelExportModal';
 import { placementAPI, ticketAPI, excelAPI } from '../services/api';
 
 ChartJS.register(
@@ -36,7 +37,9 @@ const DEPARTMENT_OPTIONS = ['CSE', 'IT', 'ECE', 'EEE', 'MECH', 'CIVIL', 'AIDS'];
 const BATCH_OPTIONS = ['2023-2027', '2024-2028', '2025-2029'];
 
 export default function PlacementDashboard({ user }) {
+  const currentUser = user || JSON.parse(localStorage.getItem('user') || '{}');
   const [activeTab, setActiveTab] = useState('analytics'); // analytics | drives | students | unwillingness | excels | communication | tickets
+  const [showCustomExportModal, setShowCustomExportModal] = useState(false);
 
   // Policy State
   const [policy, setPolicy] = useState(null);
@@ -119,13 +122,91 @@ export default function PlacementDashboard({ user }) {
   const [showUnwillingnessBuilder, setShowUnwillingnessBuilder] = useState(false);
   const [unwillingnessBuilderForm, setUnwillingnessBuilderForm] = useState({
     title: 'Placement Unwillingness Undertaking & Documentation Form',
-    instructions: 'Mandatory undertaking for students opting for Higher Studies or Entrepreneurship instead of campus placement. Upload your signed undertaking form.',
-    sampleDocumentUrl: '',
+    instructions: 'Mandatory undertaking for students opting for Higher Studies or Entrepreneurship instead of campus placement.',
     deadline: '',
+    customFields: [
+      {
+        fieldLabel: 'Primary Career Track Choice',
+        fieldType: 'multiple_choice',
+        isRequired: true,
+        options: ['Higher Studies', 'Entrepreneurship'],
+      },
+      {
+        fieldLabel: 'Detailed Reason for Opting Out of Campus Placements',
+        fieldType: 'paragraph',
+        isRequired: true,
+        options: [],
+      },
+      {
+        fieldLabel: 'Target University / Institution or Startup Venture Name',
+        fieldType: 'text',
+        isRequired: true,
+        options: [],
+      },
+      {
+        fieldLabel: 'Parent / Guardian Consent Status',
+        fieldType: 'multiple_choice',
+        isRequired: true,
+        options: ['Formal parental consent obtained', 'Consent in progress'],
+      },
+    ],
   });
+
+  const handleAddBuilderQuestion = () => {
+    setUnwillingnessBuilderForm((prev) => ({
+      ...prev,
+      customFields: [
+        ...(prev.customFields || []),
+        { fieldLabel: 'New Question', fieldType: 'text', isRequired: false, options: ['Option 1'] },
+      ],
+    }));
+  };
+
+  const handleRemoveBuilderQuestion = (idx) => {
+    setUnwillingnessBuilderForm((prev) => ({
+      ...prev,
+      customFields: (prev.customFields || []).filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleUpdateBuilderQuestion = (idx, key, val) => {
+    setUnwillingnessBuilderForm((prev) => {
+      const fields = [...(prev.customFields || [])];
+      fields[idx] = { ...fields[idx], [key]: val };
+      return { ...prev, customFields: fields };
+    });
+  };
+
+  const handleAddBuilderOption = (qIdx) => {
+    setUnwillingnessBuilderForm((prev) => {
+      const fields = [...(prev.customFields || [])];
+      const opts = [...(fields[qIdx].options || []), `Option ${(fields[qIdx].options || []).length + 1}`];
+      fields[qIdx] = { ...fields[qIdx], options: opts };
+      return { ...prev, customFields: fields };
+    });
+  };
+
+  const handleRemoveBuilderOption = (qIdx, optIdx) => {
+    setUnwillingnessBuilderForm((prev) => {
+      const fields = [...(prev.customFields || [])];
+      const opts = (fields[qIdx].options || []).filter((_, i) => i !== optIdx);
+      fields[qIdx] = { ...fields[qIdx], options: opts };
+      return { ...prev, customFields: fields };
+    });
+  };
+
+  const handleUpdateBuilderOption = (qIdx, optIdx, val) => {
+    setUnwillingnessBuilderForm((prev) => {
+      const fields = [...(prev.customFields || [])];
+      const opts = [...(fields[qIdx].options || [])];
+      opts[optIdx] = val;
+      fields[qIdx] = { ...fields[qIdx], options: opts };
+      return { ...prev, customFields: fields };
+    });
+  };
   const [savingUnwillingnessForm, setSavingUnwillingnessForm] = useState(false);
 
-  // Excel 1 Dept Filter
+  // QS I-Gauge Dept Filter
   const [excel1Dept, setExcel1Dept] = useState('all');
 
   // Communication 3-Channels State
@@ -207,8 +288,17 @@ export default function PlacementDashboard({ user }) {
     setLoadingUnwillingness(true);
     try {
       const formRes = await placementAPI.getUnwillingnessForm();
-      if (formRes.data.success) {
+      if (formRes.data.success && formRes.data.form) {
         setUnwillingnessForm(formRes.data.form);
+        const f = formRes.data.form;
+        if (f.customFields && f.customFields.length > 0) {
+          setUnwillingnessBuilderForm({
+            title: f.title || 'Placement Unwillingness Undertaking & Documentation Form',
+            instructions: f.instructions || '',
+            deadline: f.deadline ? f.deadline.split('T')[0] : '',
+            customFields: f.customFields,
+          });
+        }
       }
       const subsRes = await placementAPI.getUnwillingnessSubmissions({
         department: unwillingnessDeptFilter,
@@ -1190,63 +1280,200 @@ export default function PlacementDashboard({ user }) {
               {/* Form Customization Builder Panel */}
               {showUnwillingnessBuilder && (
                 <div className="p-4 bg-light border-bottom animate__animated animate__fadeIn">
-                  <h6 className="fw-bold text-primary mb-3">
-                    <i className="bi bi-sliders me-1"></i> Placement Unwillingness Undertaking Form Configuration
-                  </h6>
-                  <form onSubmit={handleSaveUnwillingnessForm}>
-                    <div className="row g-3">
-                      <div className="col-md-6">
-                        <label className="form-label small fw-semibold">Form Title *</label>
-                        <input
-                          type="text"
-                          className="form-control form-control-sm"
-                          value={unwillingnessBuilderForm.title}
-                          onChange={(e) => setUnwillingnessBuilderForm({ ...unwillingnessBuilderForm, title: e.target.value })}
-                          required
-                        />
+                  <div className="card shadow-sm border-0 rounded-4 overflow-hidden mb-4">
+                    <div style={{ height: '8px', backgroundColor: '#673ab7' }}></div>
+                    <div className="card-body p-4">
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <h5 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                          <i className="bi bi-ui-checks-grid text-primary"></i>
+                          Google / Microsoft Form Style Builder & Publisher
+                        </h5>
+                        <span className="badge bg-purple-subtle text-dark border">Dynamic Online Undertaking</span>
                       </div>
-                      <div className="col-md-6">
-                        <label className="form-label small fw-semibold">Sample Blank Form Document URL</label>
-                        <input
-                          type="url"
-                          className="form-control form-control-sm"
-                          placeholder="https://institution.edu/forms/undertaking.pdf"
-                          value={unwillingnessBuilderForm.sampleDocumentUrl}
-                          onChange={(e) => setUnwillingnessBuilderForm({ ...unwillingnessBuilderForm, sampleDocumentUrl: e.target.value })}
-                        />
-                      </div>
-                      <div className="col-12">
-                        <label className="form-label small fw-semibold">Instructions for Students *</label>
-                        <textarea
-                          className="form-control form-control-sm"
-                          rows="2"
-                          value={unwillingnessBuilderForm.instructions}
-                          onChange={(e) => setUnwillingnessBuilderForm({ ...unwillingnessBuilderForm, instructions: e.target.value })}
-                          required
-                        ></textarea>
-                      </div>
+                      <p className="small text-muted mb-4">
+                        Build and publish dynamic questionnaires for students who opt for Higher Studies or Entrepreneurship. Published questions appear directly on the student portal.
+                      </p>
+
+                      <form onSubmit={handleSaveUnwillingnessForm}>
+                        <div className="row g-3 mb-4">
+                          <div className="col-md-8">
+                            <label className="form-label small fw-semibold">Form Title *</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              value={unwillingnessBuilderForm.title}
+                              onChange={(e) => setUnwillingnessBuilderForm({ ...unwillingnessBuilderForm, title: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div className="col-md-4">
+                            <label className="form-label small fw-semibold">Submission Deadline (Optional)</label>
+                            <input
+                              type="date"
+                              className="form-control"
+                              value={unwillingnessBuilderForm.deadline || ''}
+                              onChange={(e) => setUnwillingnessBuilderForm({ ...unwillingnessBuilderForm, deadline: e.target.value })}
+                            />
+                          </div>
+                          <div className="col-12">
+                            <label className="form-label small fw-semibold">Form Instructions / Description *</label>
+                            <textarea
+                              className="form-control"
+                              rows="2"
+                              value={unwillingnessBuilderForm.instructions}
+                              onChange={(e) => setUnwillingnessBuilderForm({ ...unwillingnessBuilderForm, instructions: e.target.value })}
+                              required
+                            ></textarea>
+                          </div>
+                        </div>
+
+                        {/* Questions Builder Section */}
+                        <div className="mb-4">
+                          <div className="d-flex justify-content-between align-items-center mb-3">
+                            <h6 className="fw-bold text-dark mb-0">
+                              Form Questions ({unwillingnessBuilderForm.customFields?.length || 0})
+                            </h6>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary fw-semibold"
+                              onClick={handleAddBuilderQuestion}
+                            >
+                              <i className="bi bi-plus-circle me-1"></i> Add Question
+                            </button>
+                          </div>
+
+                          <div className="d-flex flex-column gap-3">
+                            {(unwillingnessBuilderForm.customFields || []).map((q, qIdx) => (
+                              <div key={qIdx} className="card border shadow-sm rounded-3 p-3 bg-white">
+                                <div className="row g-3 align-items-center mb-2">
+                                  <div className="col-md-7">
+                                    <label className="form-label small text-muted mb-1">Question Prompt #{qIdx + 1}</label>
+                                    <input
+                                      type="text"
+                                      className="form-control form-control-sm fw-semibold"
+                                      placeholder="e.g. Target University or Startup details"
+                                      value={q.fieldLabel}
+                                      onChange={(e) => handleUpdateBuilderQuestion(qIdx, 'fieldLabel', e.target.value)}
+                                      required
+                                    />
+                                  </div>
+                                  <div className="col-md-3">
+                                    <label className="form-label small text-muted mb-1">Question Type</label>
+                                    <select
+                                      className="form-select form-select-sm"
+                                      value={q.fieldType}
+                                      onChange={(e) => handleUpdateBuilderQuestion(qIdx, 'fieldType', e.target.value)}
+                                    >
+                                      <option value="text">Short Answer</option>
+                                      <option value="paragraph">Paragraph</option>
+                                      <option value="multiple_choice">Multiple Choice (Radio)</option>
+                                      <option value="checkboxes">Checkboxes</option>
+                                      <option value="dropdown">Dropdown</option>
+                                      <option value="number">Number</option>
+                                      <option value="link">URL / Link</option>
+                                    </select>
+                                  </div>
+                                  <div className="col-md-2 text-end pt-3">
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline-danger"
+                                      onClick={() => handleRemoveBuilderQuestion(qIdx)}
+                                      title="Delete question"
+                                    >
+                                      <i className="bi bi-trash"></i>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Options Builder for Multiple Choice, Checkboxes, Dropdown */}
+                                {(q.fieldType === 'multiple_choice' || q.fieldType === 'checkboxes' || q.fieldType === 'dropdown') && (
+                                  <div className="bg-light p-3 rounded mb-2">
+                                    <div className="small fw-semibold text-muted mb-2">Options:</div>
+                                    <div className="d-flex flex-column gap-2 mb-2">
+                                      {(q.options || []).map((opt, optIdx) => (
+                                        <div key={optIdx} className="input-group input-group-sm" style={{ maxWidth: '450px' }}>
+                                          <span className="input-group-text bg-white">
+                                            {q.fieldType === 'multiple_choice' ? (
+                                              <i className="bi bi-circle"></i>
+                                            ) : q.fieldType === 'checkboxes' ? (
+                                              <i className="bi bi-square"></i>
+                                            ) : (
+                                              <i className="bi bi-caret-down"></i>
+                                            )}
+                                          </span>
+                                          <input
+                                            type="text"
+                                            className="form-control"
+                                            value={opt}
+                                            onChange={(e) => handleUpdateBuilderOption(qIdx, optIdx, e.target.value)}
+                                            placeholder="Option label"
+                                            required
+                                          />
+                                          <button
+                                            type="button"
+                                            className="btn btn-outline-secondary"
+                                            onClick={() => handleRemoveBuilderOption(qIdx, optIdx)}
+                                            disabled={(q.options || []).length <= 1}
+                                          >
+                                            <i className="bi bi-x"></i>
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="btn btn-link btn-sm p-0 text-decoration-none"
+                                      onClick={() => handleAddBuilderOption(qIdx)}
+                                    >
+                                      <i className="bi bi-plus-lg me-1"></i> Add option
+                                    </button>
+                                  </div>
+                                )}
+
+                                <div className="d-flex justify-content-between align-items-center pt-2 border-top">
+                                  <div className="form-check form-switch small">
+                                    <input
+                                      className="form-check-input"
+                                      type="checkbox"
+                                      id={`req_${qIdx}`}
+                                      checked={Boolean(q.isRequired)}
+                                      onChange={(e) => handleUpdateBuilderQuestion(qIdx, 'isRequired', e.target.checked)}
+                                    />
+                                    <label className="form-check-label text-muted" htmlFor={`req_${qIdx}`}>
+                                      Required question
+                                    </label>
+                                  </div>
+                                  <small className="text-muted">Type: {q.fieldType}</small>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="text-end pt-3 border-top">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm me-2"
+                            onClick={() => setShowUnwillingnessBuilder(false)}
+                          >
+                            Close Builder
+                          </button>
+                          <button
+                            type="submit"
+                            className="btn btn-primary btn-sm fw-semibold"
+                            style={{ backgroundColor: '#673ab7', borderColor: '#673ab7' }}
+                            disabled={savingUnwillingnessForm}
+                          >
+                            {savingUnwillingnessForm ? 'Publishing...' : 'Publish Form to Students'}
+                          </button>
+                        </div>
+                      </form>
                     </div>
-                    <div className="text-end mt-3">
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm me-2"
-                        onClick={() => setShowUnwillingnessBuilder(false)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="btn btn-success btn-sm fw-semibold"
-                        disabled={savingUnwillingnessForm}
-                      >
-                        {savingUnwillingnessForm ? 'Publishing...' : 'Save & Publish Guidelines'}
-                      </button>
-                    </div>
-                  </form>
+                  </div>
                 </div>
               )}
 
-              {/* Submissions Filter */}
+                            {/* Submissions Filter */}
               <div className="p-3 bg-light border-bottom">
                 <div className="row g-2">
                   <div className="col-6 col-md-3">
@@ -1362,7 +1589,7 @@ export default function PlacementDashboard({ user }) {
 
               <div className="card-body p-4">
                 <div className="row g-4">
-                  {/* EXCEL 1: QS I-GAUGE DATA 2025-26 */}
+                  {/* QS I-GAUGE DATA 2025-26 */}
                   <div className="col-12 col-lg-6">
                     <div className="card shadow-sm border rounded-3 p-3 bg-white h-100 d-flex flex-column">
                       <div className="d-flex align-items-center mb-3">
@@ -1370,7 +1597,7 @@ export default function PlacementDashboard({ user }) {
                           <i className="bi bi-file-earmark-check-fill fs-3"></i>
                         </div>
                         <div>
-                          <h6 className="fw-bold text-dark mb-0">Excel 1: QS I-Gauge Data 2025-26</h6>
+                          <h6 className="fw-bold text-dark mb-0">QS I-Gauge Data (2025–26)</h6>
                           <small className="text-muted">Exact template with Placement 1 & 2, Entrepreneurship & Higher Studies</small>
                         </div>
                       </div>
@@ -1396,13 +1623,13 @@ export default function PlacementDashboard({ user }) {
                           download
                           className="btn btn-success btn-sm w-100 fw-semibold"
                         >
-                          <i className="bi bi-download me-1"></i> Download QS I-Gauge Excel (Excel 1)
+                          <i className="bi bi-download me-1"></i> Download QS I-Gauge Excel
                         </a>
                       </div>
                     </div>
                   </div>
 
-                  {/* EXCEL 2: CUSTOM FILTERED EXCEL */}
+                  {/* CUSTOM FILTERED EXCEL */}
                   <div className="col-12 col-lg-6">
                     <div className="card shadow-sm border rounded-3 p-3 bg-white h-100 d-flex flex-column">
                       <div className="d-flex align-items-center mb-3">
@@ -1410,7 +1637,7 @@ export default function PlacementDashboard({ user }) {
                           <i className="bi bi-sliders fs-3"></i>
                         </div>
                         <div>
-                          <h6 className="fw-bold text-dark mb-0">Excel 2: Custom Filtered Export</h6>
+                          <h6 className="fw-bold text-dark mb-0">Custom Filtered Student Records</h6>
                           <small className="text-muted">Filtered student records with active dashboard filter criteria</small>
                         </div>
                       </div>
@@ -1420,29 +1647,15 @@ export default function PlacementDashboard({ user }) {
                       <div className="mt-auto">
                         <button
                           className="btn btn-primary btn-sm w-100 fw-semibold"
-                          onClick={() => {
-                            excelAPI.downloadExcel2_Custom({
-                              department: filterDept,
-                              cgpaMin: filterCgpa === '9-10' ? 9 : filterCgpa === '8-8.99' ? 8 : 0,
-                              isPlaced: filterPlaced,
-                              search: filterSearch,
-                            }).then((res) => {
-                              const url = window.URL.createObjectURL(new Blob([res.data]));
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.setAttribute('download', `Custom_Filtered_Students_${Date.now()}.xlsx`);
-                              document.body.appendChild(link);
-                              link.click();
-                            });
-                          }}
+                          onClick={() => setShowCustomExportModal(true)}
                         >
-                          <i className="bi bi-download me-1"></i> Download Filtered Records (Excel 2)
+                          <i className="bi bi-sliders me-1"></i> Choose Fields & Download Custom Excel
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* EXCEL 3: EACH DRIVE DETAIL WORKBOOK */}
+                  {/* DRIVE DETAIL WORKBOOK */}
                   <div className="col-12 col-lg-4">
                     <div className="card shadow-sm border rounded-3 p-3 bg-white h-100 d-flex flex-column">
                       <div className="d-flex align-items-center mb-3">
@@ -1450,7 +1663,7 @@ export default function PlacementDashboard({ user }) {
                           <i className="bi bi-folder2-open fs-3 text-info"></i>
                         </div>
                         <div>
-                          <h6 className="fw-bold text-dark mb-0">Excel 3: Drive Detail Workbook</h6>
+                          <h6 className="fw-bold text-dark mb-0">Drive-Specific Details & Round Analysis</h6>
                           <small className="text-muted">Separate sheet per drive</small>
                         </div>
                       </div>
@@ -1463,13 +1676,13 @@ export default function PlacementDashboard({ user }) {
                           download
                           className="btn btn-outline-primary btn-sm w-100 fw-semibold"
                         >
-                          <i className="bi bi-download me-1"></i> Download Drives Workbook (Excel 3)
+                          <i className="bi bi-download me-1"></i> Download Drives Analysis Workbook
                         </a>
                       </div>
                     </div>
                   </div>
 
-                  {/* EXCEL 4: MASTER PLACEMENT MATRIX */}
+                  {/* MASTER PLACEMENT MATRIX */}
                   <div className="col-12 col-lg-4">
                     <div className="card shadow-sm border rounded-3 p-3 bg-white h-100 d-flex flex-column">
                       <div className="d-flex align-items-center mb-3">
@@ -1477,7 +1690,7 @@ export default function PlacementDashboard({ user }) {
                           <i className="bi bi-grid-3x3-gap-fill fs-3 text-warning"></i>
                         </div>
                         <div>
-                          <h6 className="fw-bold text-dark mb-0">Excel 4: Master Placement Matrix</h6>
+                          <h6 className="fw-bold text-dark mb-0">Master Placement Tracking Matrix</h6>
                           <small className="text-muted">Drives on X-axis, students on Y-axis</small>
                         </div>
                       </div>
@@ -1490,13 +1703,13 @@ export default function PlacementDashboard({ user }) {
                           download
                           className="btn btn-outline-warning btn-sm w-100 fw-semibold text-dark"
                         >
-                          <i className="bi bi-download me-1"></i> Download Master Matrix (Excel 4)
+                          <i className="bi bi-download me-1"></i> Download Master Placement Matrix
                         </a>
                       </div>
                     </div>
                   </div>
 
-                  {/* EXCEL 5: UNWILLINGNESS & PLACED WORKBOOK */}
+                  {/* UNWILLINGNESS & PLACED WORKBOOK */}
                   <div className="col-12 col-lg-4">
                     <div className="card shadow-sm border rounded-3 p-3 bg-white h-100 d-flex flex-column">
                       <div className="d-flex align-items-center mb-3">
@@ -1504,7 +1717,7 @@ export default function PlacementDashboard({ user }) {
                           <i className="bi bi-layers-fill fs-3 text-danger"></i>
                         </div>
                         <div>
-                          <h6 className="fw-bold text-dark mb-0">Excel 5: Unwillingness & Placed</h6>
+                          <h6 className="fw-bold text-dark mb-0">Placement Unwillingness & Placed Students Register</h6>
                           <small className="text-muted">Dual-sheet institutional register</small>
                         </div>
                       </div>
@@ -1517,7 +1730,7 @@ export default function PlacementDashboard({ user }) {
                           download
                           className="btn btn-outline-danger btn-sm w-100 fw-semibold"
                         >
-                          <i className="bi bi-download me-1"></i> Download Dual Register (Excel 5)
+                          <i className="bi bi-download me-1"></i> Download Dual Register Excel
                         </a>
                       </div>
                     </div>
@@ -1543,6 +1756,30 @@ export default function PlacementDashboard({ user }) {
         )}
 
       </div>
+
+      {/* CUSTOM EXCEL FIELD SELECTION MODAL */}
+      {showCustomExportModal && (
+        <CustomExcelExportModal
+          filters={{
+            batch: filterBatch,
+            department: filterDept,
+            cgpaMin: filterCgpa === '9-10' ? 9 : filterCgpa === '8-8.99' ? 8 : 0,
+            cgpaMax: filterCgpa === '9-10' ? 10 : filterCgpa === '8-8.99' ? 8.99 : 10,
+            isPlaced: filterPlaced,
+            placementType: filterPlacementType,
+            careerGoal: 'Placement',
+            search: filterSearch,
+          }}
+          totalMatchingCount={analytics?.placementStats?.totalOpted || 0}
+          onClose={() => setShowCustomExportModal(false)}
+          customExportFn={async ({ filters, fields }) => {
+            return await excelAPI.downloadExcel2_Custom({
+              ...filters,
+              selectedFields: fields,
+            });
+          }}
+        />
+      )}
 
       {/* FLOATING STUDENT RECORDS WINDOW (ONLY VISIBLE ON DASHBOARD TAB) */}
       {activeTab === 'analytics' && (
