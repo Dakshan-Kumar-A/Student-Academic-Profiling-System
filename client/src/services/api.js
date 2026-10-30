@@ -168,6 +168,10 @@ export const studentAPI = {
   getMessages: (params) => api.get('/student/communication/messages', { params }),
   postMessage: (data) => api.post('/student/communication/messages', data),
   replyMessage: (id, data) => api.post(`/student/communication/messages/${id}/reply`, data),
+  uploadResume: (formData) =>
+    api.post('/student/resume', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 // Notification endpoints

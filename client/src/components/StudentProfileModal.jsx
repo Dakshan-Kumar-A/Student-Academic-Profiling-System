@@ -140,7 +140,19 @@ export default function StudentProfileModal({ student: initialStudent, studentId
                 <span className="small opacity-75">{student.email}</span>
               </div>
             </div>
-            <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
+            <div className="d-flex align-items-center gap-2">
+              {(student.resumeUrl || student.resume?.url) && (
+                <a
+                  href={student.resumeUrl || student.resume?.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-sm btn-danger fw-semibold d-flex align-items-center gap-1 shadow-sm px-3"
+                >
+                  <i className="bi bi-file-earmark-pdf-fill"></i> View Resume (PDF)
+                </a>
+              )}
+              <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
+            </div>
           </div>
 
           {/* Body */}

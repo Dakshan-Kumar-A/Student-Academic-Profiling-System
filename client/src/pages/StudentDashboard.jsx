@@ -91,6 +91,50 @@ export default function StudentDashboard() {
   // Profile Edit Form State
   const [formData, setFormData] = useState({});
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
+
+  const handleResumeUpload = async (e) => {
+    const file = e.target.files ? e.target.files[0] : null;
+    if (!file) return;
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      Swal.fire('Invalid Format', 'Please upload your resume in PDF format (.pdf) only.', 'warning');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      Swal.fire('File Too Large', 'Resume file size cannot exceed 10MB.', 'warning');
+      return;
+    }
+
+    const uploadData = new FormData();
+    uploadData.append('resume', file);
+
+    setUploadingResume(true);
+    try {
+      const res = await studentAPI.uploadResume(uploadData);
+      if (res.data.success) {
+        setProfile(res.data.profile);
+        setFormData((prev) => ({
+          ...prev,
+          resume: res.data.resume,
+          resumeUrl: res.data.resumeUrl,
+        }));
+        Swal.fire({
+          icon: 'success',
+          title: 'Resume Uploaded!',
+          text: 'Your resume (' + (res.data.resume?.originalName || file.name) + ') has been uploaded successfully.',
+          timer: 2500,
+          showConfirmButton: false,
+        });
+        fetchProfile();
+      }
+    } catch (err) {
+      Swal.fire('Upload Failed', err.response?.data?.message || 'Failed to upload resume.', 'error');
+    } finally {
+      setUploadingResume(false);
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -1027,6 +1071,28 @@ export default function StudentDashboard() {
                       )}
                     </div>
                   </div>
+
+                  {(profile?.resumeUrl || profile?.resume?.url || formData.resumeUrl) && (
+                    <div className="pt-3 border-top mt-3 d-flex align-items-center justify-content-between">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bi bi-file-earmark-pdf-fill text-danger fs-4"></i>
+                        <div>
+                          <strong className="text-dark small d-block">
+                            {profile?.resume?.originalName || formData.resume?.originalName || 'Student_Resume.pdf'}
+                          </strong>
+                          <span className="text-muted" style={{ fontSize: '0.72rem' }}>Uploaded Official Resume</span>
+                        </div>
+                      </div>
+                      <a
+                        href={profile?.resumeUrl || profile?.resume?.url || formData.resumeUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-sm btn-outline-danger fw-semibold"
+                      >
+                        <i className="bi bi-file-earmark-pdf-fill me-1"></i> View Resume (PDF)
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1547,6 +1613,78 @@ export default function StudentDashboard() {
                         onChange={(e) => setFormData({ ...formData, linkedinProfile: e.target.value })}
                         placeholder="https://linkedin.com/in/username"
                       />
+                    </div>
+
+                    {/* Resume Upload Option (PDF) */}
+                    <div className="col-12 mt-3 pt-3 border-top">
+                      <div className="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+                        <div>
+                          <label className="form-label small fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                            <i className="bi bi-file-earmark-pdf-fill text-danger fs-5"></i>
+                            Student Resume Document (PDF)
+                          </label>
+                          <small className="text-muted d-block">Upload your updated resume in PDF format (Max 10MB) for placement drives and counseling.</small>
+                        </div>
+                        {formData.resumeUrl || profile?.resumeUrl || formData.resume?.url ? (
+                          <span className="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">
+                            <i className="bi bi-check-circle-fill me-1"></i> Resume Available
+                          </span>
+                        ) : (
+                          <span className="badge bg-warning-subtle text-dark border border-warning-subtle px-3 py-1">
+                            <i className="bi bi-exclamation-circle me-1"></i> No Resume Uploaded
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="row g-2 align-items-center bg-white p-3 rounded border">
+                        <div className="col-md-7">
+                          <label className="form-label small fw-semibold text-secondary mb-1">Select Resume PDF (Max 10MB)</label>
+                          <input
+                            type="file"
+                            className="form-control form-control-sm"
+                            accept=".pdf,application/pdf"
+                            onChange={handleResumeUpload}
+                            disabled={uploadingResume}
+                          />
+                          <small className="text-muted" style={{ fontSize: '0.72rem' }}>
+                            {uploadingResume ? 'Uploading resume, please wait...' : 'Selecting a file automatically uploads and attaches the PDF to your record.'}
+                          </small>
+                        </div>
+
+                        <div className="col-md-5">
+                          {(formData.resumeUrl || profile?.resumeUrl || formData.resume?.url) ? (
+                            <div className="p-2 bg-light rounded border">
+                              <div className="d-flex align-items-center gap-2 mb-1">
+                                <i className="bi bi-file-earmark-pdf text-danger fs-4"></i>
+                                <div className="text-truncate" style={{ maxWidth: '200px' }}>
+                                  <strong className="text-dark small d-block text-truncate">
+                                    {formData.resume?.originalName || profile?.resume?.originalName || 'My_Resume.pdf'}
+                                  </strong>
+                                  <small className="text-muted" style={{ fontSize: '0.68rem' }}>
+                                    Uploaded: {formData.resume?.uploadedAt ? new Date(formData.resume.uploadedAt).toLocaleDateString() : 'Active'}
+                                  </small>
+                                </div>
+                              </div>
+                              <div className="d-flex gap-2 mt-2">
+                                <a
+                                  href={formData.resumeUrl || profile?.resumeUrl || formData.resume?.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="btn btn-sm btn-outline-danger py-1 px-2 flex-grow-1"
+                                  style={{ fontSize: '0.75rem' }}
+                                >
+                                  <i className="bi bi-eye me-1"></i> View Resume
+                                </a>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-center p-2 text-muted border border-dashed rounded small">
+                              <i className="bi bi-cloud-arrow-up text-secondary d-block fs-5"></i>
+                              No PDF resume attached
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
