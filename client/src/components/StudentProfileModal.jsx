@@ -277,6 +277,7 @@ export default function StudentProfileModal({ student: initialStudent, studentId
                       <tr>
                         <th>Semester</th>
                         <th>SGPA</th>
+                        <th>Credits</th>
                         <th>CGPA</th>
                         <th>Attendance %</th>
                         <th>Arrear Status</th>
@@ -289,21 +290,22 @@ export default function StudentProfileModal({ student: initialStudent, studentId
                         student.semesters.map((s, idx) => (
                           <tr key={idx}>
                             <td className="fw-bold">Sem {s.semesterNumber}</td>
-                            <td>{s.sgpa}</td>
-                            <td>{s.cgpa}</td>
-                            <td>{s.attendancePercentage}%</td>
+                            <td>{s.sgpa || '—'}</td>
+                            <td>{s.credits || '—'}</td>
+                            <td>{s.cgpa || '—'}</td>
+                            <td>{s.attendancePercentage ? `${s.attendancePercentage}%` : '—'}</td>
                             <td>
                               <span className={`badge ${s.arrearStatus === 'Yes' ? 'bg-danger' : 'bg-success'}`}>
-                                {s.arrearStatus}
+                                {s.arrearStatus || 'No'}
                               </span>
                             </td>
-                            <td>{s.numberOfArrears}</td>
+                            <td>{s.numberOfArrears || 0}</td>
                             <td className="text-start">{s.academicAchievements || s.strongSubjects || '—'}</td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="7" className="text-center py-2 text-muted">No semester records uploaded yet.</td>
+                          <td colSpan="8" className="text-center py-2 text-muted">No semester records uploaded yet.</td>
                         </tr>
                       )}
                     </tbody>
@@ -451,6 +453,68 @@ export default function StudentProfileModal({ student: initialStudent, studentId
                 )}
               </div>
             </div>
+
+            {/* Projects & Certifications (Placement Track) */}
+            {((student.projects && student.projects.length > 0) || (student.certifications && student.certifications.length > 0)) && (
+              <div className="card border-0 shadow-sm mb-3 rounded-3">
+                <div className="card-header bg-white py-2 px-3 fw-bold text-dark border-bottom">
+                  <i className="bi bi-folder-check text-primary me-2"></i> Projects & Certifications Portfolio
+                </div>
+                <div className="card-body p-3 small">
+                  {student.projects && student.projects.length > 0 && (
+                    <div className="mb-3">
+                      <h6 className="fw-bold text-dark mb-2">Projects:</h6>
+                      <div className="d-flex flex-column gap-2">
+                        {student.projects.map((proj, pIdx) => (
+                          <div key={pIdx} className="p-2 border rounded bg-light">
+                            <div className="d-flex justify-content-between">
+                              <strong className="text-dark">{proj.title}</strong>
+                              {proj.domain && <span className="badge bg-primary-subtle text-primary">{proj.domain}</span>}
+                            </div>
+                            {proj.description && <p className="text-muted mb-1 mt-1 small">{proj.description}</p>}
+                            <div className="d-flex gap-2 mt-1">
+                              {proj.githubLink && (
+                                <a href={proj.githubLink} target="_blank" rel="noreferrer" className="badge bg-dark text-white text-decoration-none">
+                                  GitHub
+                                </a>
+                              )}
+                              {proj.liveDemoUrl && (
+                                <a href={proj.liveDemoUrl} target="_blank" rel="noreferrer" className="badge bg-primary text-white text-decoration-none">
+                                  Live Demo
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {student.certifications && student.certifications.length > 0 && (
+                    <div>
+                      <h6 className="fw-bold text-dark mb-2">Certifications:</h6>
+                      <div className="d-flex flex-wrap gap-2">
+                        {student.certifications.map((cert, cIdx) => (
+                          <div key={cIdx} className="p-2 border rounded bg-light">
+                            <span className="badge bg-success-subtle text-success me-1">
+                              {cert.certificationType || 'Global'}
+                            </span>
+                            <strong className="text-dark">{cert.name || cert.title || cert}</strong>
+                            {cert.issuingOrganization && <span className="text-muted ms-1">({cert.issuingOrganization})</span>}
+                            {cert.credentialUrl && (
+                              <a href={cert.credentialUrl} target="_blank" rel="noreferrer" className="ms-2 text-primary small text-decoration-none">
+                                Verify
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Section 7: Mentor & Coordinator Remarks (for QS I-Gauge Report & Mentoring) */}
             <div className="card border-0 shadow-sm rounded-3">
               <div className="card-header bg-white py-2 px-3 fw-bold text-dark border-bottom d-flex justify-content-between align-items-center">
