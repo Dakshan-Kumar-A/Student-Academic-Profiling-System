@@ -482,6 +482,18 @@ export default function AdminDashboard({ user }) {
     }
   };
 
+  const downloadStaffTemplate = () => {
+    const sample = [
+      { 'Full Name': 'Dr. S. Ramanathan', 'Email': 'placement.officer@college.edu', 'Role': 'Placement Officer', 'Department': 'Placement Cell' },
+      { 'Full Name': 'Prof. M. Anita', 'Email': 'cse.coordinator@college.edu', 'Role': 'Department Coordinator', 'Department': 'CSE' },
+      { 'Full Name': 'Dr. K. Vijay', 'Email': 'it.coordinator@college.edu', 'Role': 'Department Coordinator', 'Department': 'IT' },
+    ];
+    const ws = XLSX.utils.json_to_sheet(sample);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Staff_Import');
+    XLSX.writeFile(wb, 'Staff_Bulk_Import_Template.xlsx');
+  };
+
   // ------------------------------------------
   // CHART DATA DEFINITIONS
   // ------------------------------------------
@@ -1648,6 +1660,15 @@ export default function AdminDashboard({ user }) {
                 <button type="button" className="btn-close btn-close-white" onClick={() => setShowBulkModal(false)}></button>
               </div>
               <div className="modal-body p-4">
+                <div className="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded border">
+                  <div>
+                    <h6 className="fw-bold mb-1">Standard Staff Spreadsheet Template</h6>
+                    <span className="text-muted small">Columns: <code>Full Name</code>, <code>Email</code>, <code>Role</code> (Placement Officer / Department Coordinator), <code>Department</code></span>
+                  </div>
+                  <button type="button" className="btn btn-sm btn-outline-success text-nowrap ms-2" onClick={downloadStaffTemplate}>
+                    <i className="bi bi-download me-1"></i> Download Template (.xlsx)
+                  </button>
+                </div>
                 <form onSubmit={handleBulkUpload}>
                   <div className="mb-3">
                     <label className="form-label fw-semibold small">Upload Excel or CSV</label>
