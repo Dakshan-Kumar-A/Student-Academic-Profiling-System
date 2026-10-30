@@ -491,8 +491,31 @@ router.post('/users/:id/resend-invite', async (req, res) => {
 });
 
 // ==========================================
-// 3. EXCEL SHEET BULK UPLOAD
+// 3. EXCEL SHEET BULK UPLOAD & SAMPLE TEMPLATE
 // ==========================================
+// @route   GET /api/admin/users/sample-template
+// @desc    Download sample Excel spreadsheet for bulk staff onboarding
+router.get('/users/sample-template', (req, res) => {
+  try {
+    const sample = [
+      { 'Full Name': 'Dr. S. Ramanathan', 'Email': 'placement.officer@college.edu', 'Role': 'Placement Officer', 'Department': 'Placement Cell' },
+      { 'Full Name': 'Prof. M. Anita', 'Email': 'cse.coordinator@college.edu', 'Role': 'Department Coordinator', 'Department': 'CSE' },
+      { 'Full Name': 'Dr. K. Vijay', 'Email': 'it.coordinator@college.edu', 'Role': 'Department Coordinator', 'Department': 'IT' },
+      { 'Full Name': 'Prof. R. Suresh', 'Email': 'ece.coordinator@college.edu', 'Role': 'Department Coordinator', 'Department': 'ECE' },
+    ];
+    const ws = xlsx.utils.json_to_sheet(sample);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'Staff_Import');
+    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Disposition', 'attachment; filename="Staff_Bulk_Import_Template.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    return res.send(buffer);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to generate template', error: error.message });
+  }
+});
+
 // @route   POST /api/admin/users/bulk-upload
 // @desc    Parse Excel (.xlsx/.csv), create users, send single-use 24-hr temp password emails
 router.post('/users/bulk-upload', upload.single('file'), async (req, res) => {

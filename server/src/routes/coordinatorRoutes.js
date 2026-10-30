@@ -958,6 +958,29 @@ router.delete('/students/:id', async (req, res) => {
   }
 });
 
+// @route   GET /api/coordinator/students/sample-template
+// @desc    Download sample Excel spreadsheet for bulk student onboarding
+router.get('/students/sample-template', (req, res) => {
+  try {
+    const dept = getCoordinatorDept(req) || 'CSE';
+    const sample = [
+      { 'Student Name': 'Aravind Kumar', 'Roll Number': '23CS101', 'Email': 'aravind.23cs@college.edu', 'Department': dept, 'Section': 'A', 'Category': 'Day Scholar' },
+      { 'Student Name': 'Divya R', 'Roll Number': '23CS102', 'Email': 'divya.23cs@college.edu', 'Department': dept, 'Section': 'A', 'Category': 'Hosteller' },
+      { 'Student Name': 'Gokul S', 'Roll Number': '23CS103', 'Email': 'gokul.23cs@college.edu', 'Department': dept, 'Section': 'B', 'Category': 'Day Scholar' },
+    ];
+    const ws = xlsx.utils.json_to_sheet(sample);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'Student_Import');
+    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Disposition', 'attachment; filename="Student_Bulk_Import_Template.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    return res.send(buffer);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to generate template', error: error.message });
+  }
+});
+
 // @route   POST /api/coordinator/students/bulk-upload
 // @desc    Bulk create students from Excel (.xlsx/.xls/.csv) with template parsing
 router.post('/students/bulk-upload', upload.single('file'), async (req, res) => {
