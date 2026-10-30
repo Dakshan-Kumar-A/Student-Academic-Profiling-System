@@ -252,6 +252,14 @@ const studentProfileSchema = new mongoose.Schema({
   projects: [projectItemSchema],
   certifications: [certificationItemSchema],
 
+  // Resume / CV PDF Document
+  resume: {
+    url: { type: String, default: '' },
+    originalName: { type: String, default: '' },
+    uploadedAt: { type: Date, default: null },
+  },
+  resumeUrl: { type: String, default: '' },
+
   // Profile Completeness Meter (0-100%)
   profileCompleteness: {
     type: Number,

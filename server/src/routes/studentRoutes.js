@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const StudentProfile = require('../models/StudentProfile');
 const DepartmentDrive = require('../models/DepartmentDrive');
 const PlacementUnwillingness = require('../models/PlacementUnwillingness');
@@ -10,6 +13,35 @@ const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 const { logSystemEvent } = require('../utils/logger');
 const { createNotification } = require('../services/notificationService');
+
+// Configure disk storage for student resumes
+const resumeStorageDir = path.join(__dirname, '../../uploads/resumes');
+if (!fs.existsSync(resumeStorageDir)) {
+  fs.mkdirSync(resumeStorageDir, { recursive: true });
+}
+
+const resumeStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, resumeStorageDir);
+  },
+  filename: (req, file, cb) => {
+    const studentRoll = (req.user.rollNumber || req.user._id).toString().replace(/[^a-zA-Z0-9_-]/g, '_');
+    const uniqueSuffix = Date.now();
+    cb(null, `Resume_${studentRoll}_${uniqueSuffix}.pdf`);
+  },
+});
+
+const uploadResume = multer({
+  storage: resumeStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF format resumes (.pdf) are allowed!'), false);
+    }
+  },
+});
 
 // All endpoints in this router are for logged-in students (or admin)
 router.use(protect);
@@ -154,7 +186,7 @@ router.put('/profile', async (req, res) => {
       'certifications', 'projects', 'hackathons', 'internshipExperience',
       'githubProfile', 'linkedinProfile', 'hackerrankProfile', 'hackerearthProfile',
       'communicationSkillLevel', 'aptitudeSkillLevel', 'selfEvaluation',
-      'higherStudiesDetails', 'entrepreneurshipDetails',
+      'higherStudiesDetails', 'entrepreneurshipDetails', 'resumeUrl', 'resume',
     ];
 
     allowedKeys.forEach((key) => {
@@ -190,6 +222,91 @@ router.put('/profile', async (req, res) => {
   } catch (error) {
     console.error('Error updating student profile:', error);
     return res.status(500).json({ success: false, message: 'Failed to update profile', error: error.message });
+  }
+});
+
+// @route   POST /api/student/resume
+// @desc    Upload student resume in PDF format (Max 10MB)
+router.post('/resume', uploadResume.single('resume'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please select a PDF file to upload.' });
+    }
+
+    const profile = await getOrCreateProfile(req.user);
+    const fileRelativeUrl = `/uploads/resumes/${req.file.filename}`;
+
+    profile.resume = {
+      url: fileRelativeUrl,
+      originalName: req.file.originalname,
+      uploadedAt: new Date(),
+    };
+    profile.resumeUrl = fileRelativeUrl;
+
+    await profile.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Resume PDF uploaded successfully!',
+      resumeUrl: fileRelativeUrl,
+      resume: profile.resume,
+      profile,
+    });
+  } catch (error) {
+    console.error('Error uploading resume:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to upload resume' });
+  }
+});
+
+// @route   GET /api/student/resume/view
+// @desc    View currently logged-in student's resume as inline PDF
+router.get('/resume/view', async (req, res) => {
+  try {
+    const profile = await getOrCreateProfile(req.user);
+    const resumePath = profile.resumeUrl || profile.resume?.url;
+    if (!resumePath) {
+      return res.status(404).json({ success: false, message: 'No resume uploaded yet.' });
+    }
+
+    const absolutePath = path.join(__dirname, '../..', resumePath);
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({ success: false, message: 'Resume file not found on server.' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${profile.resume?.originalName || 'resume.pdf'}"`);
+    return res.sendFile(absolutePath);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/student/:id/resume
+// @desc    View a specific student's resume
+router.get('/:id/resume', async (req, res) => {
+  try {
+    const profile =
+      (await StudentProfile.findById(req.params.id)) ||
+      (await StudentProfile.findOne({ userId: req.params.id }));
+    if (!profile) {
+      return res.status(404).json({ success: false, message: 'Student profile not found.' });
+    }
+
+    const resumePath = profile.resumeUrl || profile.resume?.url;
+    if (!resumePath) {
+      return res.status(404).json({ success: false, message: 'No resume uploaded for this student.' });
+    }
+
+    const absolutePath = path.join(__dirname, '../..', resumePath);
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({ success: false, message: 'Resume file not found on server.' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${profile.resume?.originalName || 'resume.pdf'}"`);
+    return res.sendFile(absolutePath);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 

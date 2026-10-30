@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const path = require('path');
 
 dotenv.config();
 
@@ -27,6 +28,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static uploads (for student resumes, documents)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Request logger for debugging (non-blocking)
 app.use((req, res, next) => {
