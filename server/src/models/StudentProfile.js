@@ -3,12 +3,34 @@ const mongoose = require('mongoose');
 const semesterRecordSchema = new mongoose.Schema({
   semesterNumber: { type: Number, required: true },
   sgpa: { type: Number, default: 0 },
+  credits: { type: Number, default: 0 },
   cgpa: { type: Number, default: 0 },
   attendancePercentage: { type: Number, default: 0 },
   arrearStatus: { type: String, enum: ['Yes', 'No'], default: 'No' },
   numberOfArrears: { type: Number, default: 0 },
   academicAchievements: { type: String, default: '' },
   strongSubjects: { type: String, default: '' },
+});
+
+const projectItemSchema = new mongoose.Schema({
+  title: { type: String, default: '' },
+  domain: { type: String, default: '' },
+  role: { type: String, default: '' },
+  githubLink: { type: String, default: '' },
+  liveDemoUrl: { type: String, default: '' },
+  description: { type: String, default: '' },
+});
+
+const certificationItemSchema = new mongoose.Schema({
+  name: { type: String, default: '' },
+  certificationType: {
+    type: String,
+    default: 'Global Certification',
+  },
+  issuingOrganization: { type: String, default: '' },
+  issueDate: { type: String, default: '' },
+  credentialId: { type: String, default: '' },
+  credentialUrl: { type: String, default: '' },
 });
 
 const arrearRecordSchema = new mongoose.Schema({
@@ -226,6 +248,10 @@ const studentProfileSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: null },
   },
 
+  // Projects and Certifications (detailed portfolio records)
+  projects: [projectItemSchema],
+  certifications: [certificationItemSchema],
+
   // Profile Completeness Meter (0-100%)
   profileCompleteness: {
     type: Number,
@@ -254,8 +280,32 @@ studentProfileSchema.pre('save', function (next) {
   }
 
   if (this.semesters && this.semesters.length > 0) {
-    const latestSem = [...this.semesters].sort((a, b) => b.semesterNumber - a.semesterNumber)[0];
-    this.currentCGPA = latestSem.cgpa || 0;
+    let totalCredits = 0;
+    let weightedSgpaSum = 0;
+    let validSgpaCount = 0;
+    let sumSgpa = 0;
+
+    this.semesters.forEach(s => {
+      const credits = Number(s.credits) || 0;
+      const sgpa = Number(s.sgpa) || 0;
+      if (sgpa > 0) {
+        validSgpaCount++;
+        sumSgpa += sgpa;
+        if (credits > 0) {
+          totalCredits += credits;
+          weightedSgpaSum += (sgpa * credits);
+        }
+      }
+    });
+
+    if (totalCredits > 0) {
+      this.currentCGPA = Number((weightedSgpaSum / totalCredits).toFixed(2));
+    } else if (validSgpaCount > 0) {
+      this.currentCGPA = Number((sumSgpa / validSgpaCount).toFixed(2));
+    } else {
+      const latestSem = [...this.semesters].sort((a, b) => b.semesterNumber - a.semesterNumber)[0];
+      this.currentCGPA = latestSem.cgpa || 0;
+    }
   }
 
   // Profile Completeness Calculation (0-100%)

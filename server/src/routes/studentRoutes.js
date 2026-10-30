@@ -150,7 +150,7 @@ router.put('/profile', async (req, res) => {
       'studentCategory', 'hostelName', 'distanceToCollege', 'gender', 'dateOfBirth',
       'fatherDetails', 'motherDetails', 'guardianDetails', 'emergencyContactNumber',
       'firstGenGraduate', 'scholarshipAvailed', 'mentorshipGuidanceRequired',
-      'semesters', 'arrears', 'technicalSkills', 'languages', 'domainInterest',
+      'semesters', 'currentCGPA', 'arrears', 'technicalSkills', 'languages', 'domainInterest',
       'certifications', 'projects', 'hackathons', 'internshipExperience',
       'githubProfile', 'linkedinProfile', 'hackerrankProfile', 'hackerearthProfile',
       'communicationSkillLevel', 'aptitudeSkillLevel', 'selfEvaluation',
